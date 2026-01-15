@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, List, Union, Any
+from typing import Optional, List, Any
 
 # --- 基础组件 ---
 class Genre(BaseModel):
@@ -98,3 +98,33 @@ class MediaResource(BaseModel):
         if isinstance(v, int):
             return bool(v)
         return v
+
+# --- 115转存与离线下载 ---
+class P115ShareFile(BaseModel):
+    id: str = Field(..., description="文件ID或目录ID")
+    parent_id: str = Field(..., description="父目录ID")
+    name: str = Field(..., description="文件名")
+    size: Optional[str] = Field(None, description="文件大小")
+    is_dir: bool = Field(False, description="是否为目录")
+    pick_code: str = Field(..., description="提取码")
+    sha1: Optional[str] = None
+
+class P115ShareListRequest(BaseModel):
+    share_link: str = Field(..., description="115分享链接")
+    cid: Optional[str] = Field("0", description="要查看的目录ID，默认为根目录0")
+    password: Optional[str] = Field(None, description="提取码/密码，如果链接中不包含则需要填写")
+
+class P115ShareSaveRequest(BaseModel):
+    share_link: str = Field(..., description="115分享链接")
+    file_ids: List[str] = Field(..., description="要转存的文件/目录ID列表")
+    password: Optional[str] = Field(None, description="提取码/密码")
+    to_cid: Optional[str] = Field(None, description="目标目录ID，如果不填则使用配置的 P115_SAVE_PATH") # 新增字段
+
+class P115OfflineAddRequest(BaseModel):
+    urls: List[str] = Field(..., description="下载链接列表 (http/ftp/magnet/ed2k)")
+    to_cid: Optional[str] = Field(None, description="目标目录ID，如果不填则使用配置的 P115_DOWNLOAD_PATH") # 顺便也给离线下载加上
+
+class P115Response(BaseModel):
+    state: bool
+    message: str = "Success"
+    data: Any = None

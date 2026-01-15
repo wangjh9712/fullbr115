@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     NULLBR_APP_ID: str = ""
     NULLBR_API_KEY: str = ""
     PROXY_URL: Optional[str] = None
+    P115_COOKIE: str = ""
+    P115_SAVE_PATH: str = ""
+    P115_DOWNLOAD_PATH: str = ""
 
     class Config:
         env_file = ".env"

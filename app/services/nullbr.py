@@ -1,7 +1,7 @@
 from nullbr import NullbrSDK
 from app.core.config import settings
 from app.models.schemas import MediaResource
-from typing import List, Optional
+from typing import List
 
 class NullbrService:
     def __init__(self):
