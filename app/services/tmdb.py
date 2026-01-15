@@ -1,4 +1,4 @@
-from tmdbv3api import TMDb, Movie, TV, Search, Discover, Genre as TMDBGenre
+from tmdbv3api import TMDb, Movie, TV, Search, Discover, Genre as TMDBGenre, Season as TMDBSeason
 from app.core.config import settings
 from app.models.schemas import (
     MediaMeta, MediaDetail, SearchResult, 
@@ -11,33 +11,30 @@ class TMDBService:
         self.tmdb = TMDb()
         self.tmdb.api_key = settings.TMDB_API_KEY
         self.tmdb.language = settings.TMDB_LANGUAGE
-        self.tmdb.debug = False # 调试模式
+        self.tmdb.debug = False
         
         self.movie_api = Movie()
         self.tv_api = TV()
         self.search_api = Search()
         self.discover_api = Discover()
         self.genre_api = TMDBGenre()
+        self.season_api = TMDBSeason()
 
     def _ensure_list(self, obj: Any) -> List:
-        """
-        核心修复：强制将 tmdbv3api 的各种奇怪返回类型转为标准 List
-        """
+        """强制转为 List"""
         if obj is None:
             return []
         if isinstance(obj, list):
             return obj
-        # 如果是 tmdbv3api 的 AsObj 或其他可迭代对象，强转为 list
         try:
             return list(obj)
         except TypeError:
             return []
 
     def _get_attr(self, obj: Any, key: str, default: Any = None) -> Any:
-        """安全获取属性，优先 getattr，其次 dict get"""
+        """安全获取属性"""
         if hasattr(obj, key):
             val = getattr(obj, key)
-            # 修复：tmdb库有时候返回None，有时候不返回key，统一处理
             return val if val is not None else default
         if isinstance(obj, dict):
             return obj.get(key, default)
@@ -47,7 +44,6 @@ class TMDBService:
         return f"https://image.tmdb.org/t/p/{size}{path}" if path else None
 
     def _parse_basic(self, item, media_type_override=None) -> MediaMeta:
-        """基础信息解析 (Search/Discover/Details 通用)"""
         m_type = self._get_attr(item, 'media_type', media_type_override)
         if not m_type:
             if hasattr(item, 'title'): m_type = 'movie' 
@@ -58,7 +54,6 @@ class TMDBService:
         orig_title = self._get_attr(item, 'original_title', self._get_attr(item, 'original_name', 'Unknown'))
         date = self._get_attr(item, 'release_date', self._get_attr(item, 'first_air_date', ''))
         
-        # 处理 Genre IDs (Search接口返回 genre_ids, Details 接口通常在 genres 对象里)
         g_ids = self._ensure_list(self._get_attr(item, 'genre_ids', []))
 
         return MediaMeta(
@@ -75,15 +70,13 @@ class TMDBService:
         )
 
     def _parse_credits(self, credits_obj):
-        """解析演职员表"""
         cast = []
         directors = []
         
-        # 1. 解析演员 (Cast)
         raw_cast = self._get_attr(credits_obj, 'cast')
-        safe_cast = self._ensure_list(raw_cast) # 强转 List
+        safe_cast = self._ensure_list(raw_cast)
         
-        for c in safe_cast[:15]: # 取前15位
+        for c in safe_cast[:15]:
             cast.append(Person(
                 id=self._get_attr(c, 'id'),
                 name=self._get_attr(c, 'name'),
@@ -91,9 +84,8 @@ class TMDBService:
                 profile_path=self._get_image_url(self._get_attr(c, 'profile_path'))
             ))
         
-        # 2. 解析导演 (Crew)
         raw_crew = self._get_attr(credits_obj, 'crew')
-        safe_crew = self._ensure_list(raw_crew) # 强转 List
+        safe_crew = self._ensure_list(raw_crew)
 
         for c in safe_crew:
             if self._get_attr(c, 'job') == 'Director':
@@ -106,7 +98,6 @@ class TMDBService:
         return directors, cast
 
     def get_details_full(self, media_type: str, tmdb_id: int) -> MediaDetail:
-        """获取详情 (包含 append_to_response)"""
         append_str = "credits,recommendations,similar"
         
         if media_type == 'movie':
@@ -114,40 +105,34 @@ class TMDBService:
         else:
             data = self.tv_api.details(tmdb_id, append_to_response=append_str)
 
-        # 1. 基础转换
         basic = self._parse_basic(data, media_type)
         
-        # 2. 演职员 (Credits)
         directors, cast = [], []
         credits_obj = self._get_attr(data, 'credits')
         if credits_obj:
             directors, cast = self._parse_credits(credits_obj)
 
-        # 3. 推荐 (Recommendations)
         recommendations = []
         recs_obj = self._get_attr(data, 'recommendations')
         if recs_obj:
             recs_list = self._ensure_list(self._get_attr(recs_obj, 'results'))
             recommendations = [self._parse_basic(i, media_type) for i in recs_list[:10]]
             
-        # 4. 相似 (Similar)
         similar = []
         sim_obj = self._get_attr(data, 'similar')
         if sim_obj:
             sim_list = self._ensure_list(self._get_attr(sim_obj, 'results'))
             similar = [self._parse_basic(i, media_type) for i in sim_list[:10]]
 
-        # 5. 风格 (Genres) - 详情页返回的是 dict list，不是 int list
         genres = []
         raw_genres = self._ensure_list(self._get_attr(data, 'genres'))
-        genre_ids = [] # 顺便补全 basic 里的 genre_ids
+        genre_ids = []
         for g in raw_genres:
             gid = self._get_attr(g, 'id')
             gname = self._get_attr(g, 'name')
             genres.append(Genre(id=gid, name=gname))
             genre_ids.append(gid)
         
-        # 6. 剧集季列表
         seasons = []
         if media_type == 'tv':
             raw_seasons = self._ensure_list(self._get_attr(data, 'seasons'))
@@ -161,8 +146,6 @@ class TMDBService:
                     air_date=self._get_attr(s, 'air_date')
                 ))
 
-        # 构造返回对象
-        # 注意: 这里手动更新 genre_ids，因为 Details 接口通常不直接返回 genre_ids 数组
         basic.genre_ids = genre_ids 
 
         return MediaDetail(
@@ -177,15 +160,12 @@ class TMDBService:
             seasons=seasons
         )
 
-    # --- 以下方法逻辑保持简单，但也应用 _get_attr 增强健壮性 ---
-
     def search_media(self, query: str, page: int = 1, min_vote: float = 0, max_vote: float = 10) -> SearchResult:
         results = self.search_api.multi(term=query, page=page)
         safe_results = self._ensure_list(results)
         
         parsed = []
         for item in safe_results:
-            # 过滤
             m_type = self._get_attr(item, 'media_type')
             if m_type not in ['movie', 'tv']: continue
             
@@ -260,7 +240,7 @@ class TMDBService:
             ))
 
         return Season(
-            id=self._get_attr(s_data, 'id', 0),
+            id=self._get_attr(s_data, 'id', 0) or 0,
             season_number=season_number,
             name=self._get_attr(s_data, 'name', f"Season {season_number}"),
             poster_path=self._get_image_url(self._get_attr(s_data, 'poster_path')),
