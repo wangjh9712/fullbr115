@@ -57,7 +57,7 @@ async def search_media(
     """
     if not query:
         raise HTTPException(status_code=400, detail="Query cannot be empty")
-    return tmdb_service.search_media(query, page, min_vote, max_vote)
+    return tmdb_service.search_media(query, page)
 
 # --- 详情 Details ---
 @router.get("/details/{media_type}/{tmdb_id}", response_model=MediaDetail)

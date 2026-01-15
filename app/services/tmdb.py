@@ -160,7 +160,7 @@ class TMDBService:
             seasons=seasons
         )
 
-    def search_media(self, query: str, page: int = 1, min_vote: float = 0, max_vote: float = 10) -> SearchResult:
+    def search_media(self, query: str, page: int = 1) -> SearchResult:
         results = self.search_api.multi(term=query, page=page)
         safe_results = self._ensure_list(results)
         
@@ -168,9 +168,6 @@ class TMDBService:
         for item in safe_results:
             m_type = self._get_attr(item, 'media_type')
             if m_type not in ['movie', 'tv']: continue
-            
-            vote = self._get_attr(item, 'vote_average', 0)
-            if not (min_vote <= vote <= max_vote): continue
 
             parsed.append(self._parse_basic(item))
             
