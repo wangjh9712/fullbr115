@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional, List, Union, Any
 
 # --- 基础组件 ---
 class Genre(BaseModel):
@@ -64,3 +64,37 @@ class SearchResult(BaseModel):
     total_results: int
     page: int
     results: List[MediaMeta]
+
+# --- NULLBR 资源 ---
+class MediaResource(BaseModel):
+    """
+    统一资源模型
+    适配 Nullbr SDK 的三种资源类型: 115, Magnet, Ed2k
+    """
+    title: str              # 资源名称 (name or title)
+    size: str               # 文件大小
+    link: str               # 链接内容 (magnet, ed2k, or share_link)
+    link_type: str          # '115_share', 'magnet', 'ed2k'
+    
+    # --- 详细元数据 ---
+    resolution: Optional[str] = None    # e.g. "4K", "1080p"
+    quality: Optional[str] = None       # e.g. "HDR10", "Remux"
+    source: Optional[str] = None        # e.g. "Blu-ray"
+    has_chinese_subtitle: bool = False  # zh_sub (1=True, 0=False)
+    
+    # --- 115特有 ---
+    season_list: Optional[List[str]] = None # 仅 115 分享链接可能有此字段
+
+    @field_validator('quality', mode='before')
+    def parse_quality(cls, v):
+        """处理 quality 字段可能是列表的情况"""
+        if isinstance(v, list):
+            return ", ".join(v)
+        return v
+
+    @field_validator('has_chinese_subtitle', mode='before')
+    def parse_zh_sub(cls, v):
+        """处理 int 类型的 bool"""
+        if isinstance(v, int):
+            return bool(v)
+        return v
