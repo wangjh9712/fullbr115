@@ -5,9 +5,14 @@ from app.models.schemas import (
     Person, Genre, Season, Episode
 )
 from typing import Optional, List, Any
+import os
 
 class TMDBService:
     def __init__(self):
+        if settings.PROXY_URL:
+            os.environ["HTTP_PROXY"] = settings.PROXY_URL
+            os.environ["HTTPS_PROXY"] = settings.PROXY_URL
+
         self.tmdb = TMDb()
         self.tmdb.api_key = settings.TMDB_API_KEY
         self.tmdb.language = settings.TMDB_LANGUAGE

@@ -1,10 +1,12 @@
 from pydantic_settings import BaseSettings
+from typing import Optional
 
 class Settings(BaseSettings):
     TMDB_API_KEY: str
     TMDB_LANGUAGE: str = "zh-CN"
     NULLBR_APP_ID: str = ""
     NULLBR_API_KEY: str = ""
+    PROXY_URL: Optional[str] = None
 
     class Config:
         env_file = ".env"
