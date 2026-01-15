@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+tmdbv3api
+nullbr
+p115client
+pydantic-settings
+uvloop
