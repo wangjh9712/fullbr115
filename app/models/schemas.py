@@ -128,3 +128,17 @@ class P115Response(BaseModel):
     state: bool
     message: str = "Success"
     data: Any = None
+
+class P115FileListRequest(BaseModel):
+    cid: str = Field("0", description="要浏览的目录ID，默认为根目录0")
+    limit: int = Field(100, description="每页数量")
+    offset: int = Field(0, description="偏移量")
+
+class P115File(BaseModel):
+    id: str = Field(..., description="文件ID或目录ID")
+    parent_id: str = Field(..., description="父目录ID")
+    name: str = Field(..., description="文件名")
+    size: Optional[str] = Field(None, description="文件大小")
+    is_dir: bool = Field(False, description="是否为目录")
+    pick_code: str = Field(..., description="提取码")
+    time: str = Field(..., description="修改时间")

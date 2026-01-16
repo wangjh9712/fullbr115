@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Body
 from app.models.schemas import (
     P115ShareListRequest, P115ShareSaveRequest, P115OfflineAddRequest, 
-    P115Response, P115ShareFile
+    P115FileListRequest, P115Response, P115ShareFile
 )
 from app.services.p115 import p115_service
 from typing import List
@@ -54,5 +54,21 @@ async def add_offline_tasks(request: P115OfflineAddRequest):
         if not result["success"]:
              return P115Response(state=False, message=result["message"], data=result.get("raw"))
         return P115Response(state=True, message="离线任务添加成功", data=result.get("raw"))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/files/list", response_model=P115Response)
+async def list_user_files(request: P115FileListRequest):
+    """
+    浏览 Cookie 账号下的文件目录。
+    返回数据中包含 'path' 字段，显示当前路径结构，方便获取 CID。
+    """
+    try:
+        result = p115_service.list_files(
+            cid=request.cid,
+            limit=request.limit,
+            offset=request.offset
+        )
+        return P115Response(state=True, data=result)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -188,4 +188,64 @@ class P115Service:
 
         return {"success": True, "message": "Tasks added successfully", "raw": resp}
 
+    def list_files(self, cid: str = "0", limit: int = 100, offset: int = 0) -> Dict[str, Any]:
+        """
+        列出个人网盘文件 (fs_files)。
+        """
+        resp = self.client.fs_files({
+            "cid": cid,
+            "limit": limit,
+            "offset": offset,
+            "show_dir": 1, # 同时显示目录
+            "asc": 0,      # 降序
+            "o": "user_ptime" # 按修改时间排序
+        })
+
+        if not resp.get("state"):
+            raise ValueError(f"Failed to list files: {resp.get('error')}")
+
+        # 解析数据结构
+        # fs_files 的 data 字段有时是列表，有时包含 count/path/data 的字典
+        raw_data = resp.get("data")
+        file_list = []
+        path_list = []
+        count = 0
+        
+        if isinstance(raw_data, list):
+            file_list = raw_data
+            count = len(raw_data)
+        elif isinstance(raw_data, dict):
+            file_list = raw_data.get("data", [])
+            path_list = raw_data.get("path", [])
+            count = raw_data.get("count", 0)
+        
+        results = []
+        for item in file_list:
+            # 判断是否为目录：通常目录没有 'fid'，或者有 'cid' 作为它的ID
+            # 115 API: 
+            #   文件: { "fid": "...", "cid": "父目录ID", "n": "name" ... }
+            #   目录: { "cid": "目录ID", "pid": "父目录ID", "n": "name" ... }
+            
+            is_dir = "fid" not in item
+            
+            # 提取 ID
+            item_id = item.get("cid") if is_dir else item.get("fid")
+            parent_id = item.get("pid") if is_dir else item.get("cid")
+            
+            results.append({
+                "id": str(item_id),
+                "parent_id": str(parent_id),
+                "name": item.get("n", "Unknown"),
+                "size": str(item.get("s", 0)),
+                "is_dir": is_dir,
+                "pick_code": item.get("pc", ""),
+                "time": item.get("t", "") or item.get("upt", ""), # 修改时间
+            })
+            
+        return {
+            "count": count,
+            "path": path_list, # 面包屑，前端可用于展示 "根目录 > 电影 > 2024"
+            "list": results
+        }
+        
 p115_service = P115Service()    
