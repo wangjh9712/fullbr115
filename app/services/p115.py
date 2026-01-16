@@ -105,12 +105,40 @@ class P115Service:
         
         results = []
         for item in file_list:
+            # 解析 115 Share 列表项
+            # 文件夹: 通常没有 fid, cid 为文件夹ID, pid 为父ID, fo=1
+            # 文件: fid 为文件ID, cid 为父ID, fo=0 或不存在
+            
+            fid = item.get("fid")
+            cid_val = item.get("cid")
+            pid_val = item.get("pid")
+            name = item.get("n", "")
+            
+            # 逻辑修正：
+            # 1. 如果文件名以 .iso 结尾，强制视为文件 (is_dir=False)
+            # 2. 否则，如果 fo=1 或没有 fid，视为目录
+            
+            is_iso = name.lower().endswith('.iso')
+            
+            if is_iso:
+                is_dir = False
+            else:
+                is_dir = (item.get("fo") == 1) or (not fid)
+
+            # ID 分配逻辑
+            if is_dir:
+                item_id = cid_val
+                parent_id = pid_val
+            else:
+                item_id = fid
+                parent_id = cid_val
+
             results.append({
-                "id": str(item.get("fid")),
-                "parent_id": str(item.get("cid")),
-                "name": item.get("n"),
+                "id": str(item_id),
+                "parent_id": str(parent_id),
+                "name": name,
                 "size": str(item.get("s")),
-                "is_dir": bool(item.get("fo")), # fo=1 is folder
+                "is_dir": is_dir,
                 "pick_code": item.get("pc"),
                 "sha1": item.get("sha"),
             })

@@ -66,7 +66,7 @@
         /* ISO 哑光黑金风格 */
         .iso-black-gold {
             background: linear-gradient(145deg, #3a3a3a 0%, #1f1f1f 100%);
-            border: 1px solid rgba(255, 215, 0, 0.25);
+            border: 1px solid rgba(255, 215, 0, 0.4);
             color: #e0e0e0;
             box-shadow: 0 4px 6px rgba(0,0,0,0.2);
             position: relative;
@@ -79,7 +79,7 @@
             background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.4), transparent);
         }
         .iso-black-gold:hover {
-            border-color: rgba(255, 215, 0, 0.5);
+            border-color: rgba(255, 215, 0, 0.7);
             background: linear-gradient(145deg, #454545 0%, #2a2a2a 100%);
             transform: translateY(-1px);
             box-shadow: 0 6px 12px rgba(0,0,0,0.3);
@@ -93,7 +93,82 @@
 </head>
 <body class="bg-gray-100 dark:bg-emby-dark text-gray-900 dark:text-gray-100 transition-colors duration-300 font-sans">
 
+<script type="text/x-template" id="tree-node-template">
+    <div class="ml-0">
+        <div class="flex items-center py-2 px-2 group transition-all cursor-pointer border-b border-gray-200 dark:border-gray-700/50"
+             :class="[
+                 isISO ? 'iso-black-gold rounded my-1 border-0' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50',
+                 isRoot ? 'bg-gray-50 dark:bg-gray-800 rounded-t-lg' : ''
+             ]"
+             @click="toggle">
+            
+            <span v-if="item.is_dir && !isISO" class="mr-2 w-4 text-center text-gray-400 hover:text-emby-accent transition-transform duration-200"
+                  :class="{'rotate-90': isOpen}">
+                <i class="fa-solid fa-caret-right"></i>
+            </span>
+            <span v-else class="mr-2 w-4"></span>
+
+            <div class="mr-3 text-lg flex-shrink-0">
+                <i v-if="isISO" class="fa-solid fa-compact-disc iso-text-gold"></i>
+                <i v-else-if="item.is_dir" class="fa-solid text-yellow-500" 
+                   :class="isOpen ? 'fa-folder-open' : 'fa-folder'"></i>
+                <i v-else class="fa-solid fa-file-video text-blue-400"></i>
+            </div>
+            
+            <div class="flex-1 min-w-0 pr-4">
+                <div class="flex items-center flex-wrap gap-2">
+                    <span class="truncate font-medium select-none text-sm" :class="isISO ? 'iso-text-gold' : ''">
+                        {{ item.name }}
+                    </span>
+                    <div v-if="item.extraTags && item.extraTags.length" class="flex space-x-1">
+                        <span v-for="tag in item.extraTags" :key="tag" 
+                              class="px-1.5 py-0.5 rounded text-[10px] bg-gray-200 dark:bg-gray-600/50 text-gray-600 dark:text-gray-300 border border-transparent"
+                              :class="isISO ? '!bg-yellow-900/30 !text-yellow-200 !border-yellow-600/30' : ''">
+                            {{ tag }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <span class="text-xs text-gray-500 dark:text-gray-400 mr-4 font-mono hidden sm:block whitespace-nowrap" :class="isISO ? '!text-gray-300' : ''">
+                {{ formatBytes(item.size) }}
+            </span>
+
+            <button @click.stop="onSave" 
+                    class="p-2 rounded-full text-gray-400 hover:text-white hover:bg-emby-green transition shadow-sm" 
+                    title="转存到网盘">
+                <i class="fa-solid fa-cloud-arrow-up"></i>
+            </button>
+        </div>
+
+        <div v-if="isOpen" class="pl-4 md:pl-6 border-l border-gray-200 dark:border-gray-700 ml-3">
+            <div v-if="loading" class="py-2 text-xs text-gray-500 flex items-center">
+                <i class="fa-solid fa-spinner fa-spin mr-2"></i> 加载中...
+            </div>
+            <template v-else>
+                <tree-node v-for="child in children" 
+                    :key="child.id" 
+                    :item="child" 
+                    :share-link="shareLink"
+                    :password="password"
+                    @notify="$emit('notify', $event)"
+                ></tree-node>
+            </template>
+        </div>
+    </div>
+</script>
+
 <div id="app" v-cloak class="min-h-screen flex flex-col relative overflow-x-hidden">
+
+    <div class="fixed top-20 right-5 z-[100] space-y-3 w-80 pointer-events-none">
+        <div v-for="toast in toasts" :key="toast.id" 
+             class="flex items-start p-4 rounded-lg shadow-lg text-white transform transition-all duration-300 pointer-events-auto backdrop-blur-md"
+             :class="toast.type === 'success' ? 'bg-emby-green/90' : 'bg-red-500/90'">
+            <i class="fa-solid mt-1 mr-3" :class="toast.type === 'success' ? 'fa-check-circle' : 'fa-exclamation-circle'"></i>
+            <div class="flex-1 text-sm break-words font-medium">{{ toast.message }}</div>
+            <button @click="removeToast(toast.id)" class="ml-2 hover:text-gray-200"><i class="fa-solid fa-times"></i></button>
+        </div>
+    </div>
 
     <nav class="sticky top-0 z-50 bg-white/90 dark:bg-black/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 shadow-sm">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -305,6 +380,7 @@
                         :availability="detailData.availability"
                         :injected-115="detailData.media_type === 'tv' ? fullSeries115 : null"
                         context="main"
+                        @notify="showToast"
                     ></resource-panel>
                 </div>
 
@@ -333,6 +409,7 @@
                                 :availability="detailData.availability"
                                 :injected-115="getCurrentSeason115(currentSeasonData.season_number)"
                                 context="season"
+                                @notify="showToast"
                             ></resource-panel>
                         </div>
 
@@ -419,6 +496,7 @@
                             media-type="tv_episode"
                             :availability="detailData.availability"
                             context="episode"
+                            @notify="showToast"
                         ></resource-panel>
                     </div>
                 </div>
@@ -451,50 +529,69 @@
             </div>
 
             <div v-else class="space-y-2">
-                <div v-for="(res, idx) in displayResources" :key="idx" 
-                     class="p-3 rounded transition flex flex-col sm:flex-row gap-2 sm:items-center"
-                     :class="isIso(res) ? 'iso-black-gold' : 'bg-white dark:bg-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700'">
-                    
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center mb-1">
-                            <span v-if="mediaType === 'tv_episode'" class="text-[10px] px-1.5 py-0.5 rounded mr-2 flex-shrink-0 font-bold"
-                                :class="res.link_type === 'magnet' ? 'bg-red-500/10 text-red-500' : 'bg-blue-500/10 text-blue-500'">
-                                {{ res.link_type === 'magnet' ? 'MAG' : 'ED2K' }}
-                            </span>
-
-                            <span class="text-sm font-medium truncate" 
-                                  :class="isIso(res) ? 'iso-text-gold' : 'text-gray-800 dark:text-gray-200'" 
-                                  :title="res.title">{{ res.title }}</span>
-                        </div>
+                <template v-if="activeTab === '115_share'">
+                    <div v-for="(res, idx) in displayResources" :key="idx" class="rounded overflow-hidden mb-2">
+                        <tree-node 
+                            :item="{ 
+                                name: res.title, 
+                                is_dir: true, 
+                                id: '0', 
+                                size: res.size,
+                                extraTags: [res.resolution, res.has_chinese_subtitle?'中字':null, res.season_tag].filter(Boolean)
+                            }"
+                            :share-link="res.link"
+                            :is-root="true" 
+                            @notify="$emit('notify', $event)"
+                        ></tree-node>
+                    </div>
+                </template>
+                
+                <template v-else>
+                    <div v-for="(res, idx) in displayResources" :key="idx" 
+                         class="p-3 rounded transition flex flex-col sm:flex-row gap-2 sm:items-center"
+                         :class="isIso(res) ? 'iso-black-gold' : 'bg-white dark:bg-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700'">
                         
-                        <div class="flex flex-wrap gap-1.5 mt-1 opacity-90">
-                            <span v-if="res.season_tag" class="text-[10px] px-1.5 py-0.5 rounded bg-emby-green/10 text-emby-green border border-emby-green/30 font-medium">
-                                {{ res.season_tag }}
-                            </span>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center mb-1">
+                                <span v-if="mediaType === 'tv_episode'" class="text-[10px] px-1.5 py-0.5 rounded mr-2 flex-shrink-0 font-bold"
+                                    :class="res.link_type === 'magnet' ? 'bg-red-500/10 text-red-500' : 'bg-blue-500/10 text-blue-500'">
+                                    {{ res.link_type === 'magnet' ? 'MAG' : 'ED2K' }}
+                                </span>
 
-                            <span v-if="res.size" class="text-[10px] px-1.5 py-0.5 rounded"
-                                :class="isIso(res) ? 'bg-white/10 text-gray-300 border border-white/20' : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'">
-                                {{ res.size }}
-                            </span>
-                            <span v-if="res.resolution" class="text-[10px] px-1.5 py-0.5 rounded border"
-                                :class="isIso(res) ? 'bg-blue-900/30 text-blue-300 border-blue-500/50' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-800'">
-                                {{ res.resolution }}
-                            </span>
-                             <span v-if="res.quality" class="text-[10px] px-1.5 py-0.5 rounded"
-                                 :class="isIso(res) ? 'bg-purple-900/50 text-purple-200' : 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300'">
-                                {{ res.quality }}
-                            </span>
+                                <span class="text-sm font-medium truncate" 
+                                      :class="isIso(res) ? 'iso-text-gold' : 'text-gray-800 dark:text-gray-200'" 
+                                      :title="res.title">{{ res.title }}</span>
+                            </div>
+                            
+                            <div class="flex flex-wrap gap-1.5 mt-1 opacity-90">
+                                <span v-if="res.season_tag" class="text-[10px] px-1.5 py-0.5 rounded bg-emby-green/10 text-emby-green border border-emby-green/30 font-medium">
+                                    {{ res.season_tag }}
+                                </span>
+
+                                <span v-if="res.size" class="text-[10px] px-1.5 py-0.5 rounded"
+                                    :class="isIso(res) ? 'bg-white/10 text-gray-300 border border-white/20' : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'">
+                                    {{ res.size }}
+                                </span>
+                                <span v-if="res.resolution" class="text-[10px] px-1.5 py-0.5 rounded border"
+                                    :class="isIso(res) ? 'bg-blue-900/30 text-blue-300 border-blue-500/50' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-800'">
+                                    {{ res.resolution }}
+                                </span>
+                                 <span v-if="res.quality" class="text-[10px] px-1.5 py-0.5 rounded"
+                                     :class="isIso(res) ? 'bg-purple-900/50 text-purple-200' : 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300'">
+                                    {{ res.quality }}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="flex-shrink-0 ml-auto flex items-center space-x-2">
+                             <button @click="addOfflineTask(res.link)" 
+                                    class="p-2 rounded-full text-gray-400 hover:text-white hover:bg-emby-green transition shadow-sm"
+                                    title="离线下载">
+                                <i class="fa-solid fa-cloud-download-alt"></i>
+                            </button>
                         </div>
                     </div>
-
-                    <div class="flex-shrink-0 ml-auto">
-                        <button @click="copyLink(res.link)" 
-                            class="text-xs px-3 py-1.5 rounded transition font-bold"
-                            :class="isIso(res) ? 'bg-yellow-600/80 text-white hover:bg-yellow-500' : 'bg-gray-200 dark:bg-gray-600 hover:bg-emby-accent hover:text-white'">
-                            复制
-                        </button>
-                    </div>
-                </div>
+                </template>
             </div>
         </div>
 
@@ -505,7 +602,129 @@
 </template>
 
 <script>
-    const { createApp, ref, computed, onMounted, watch, nextTick } = Vue;
+    const { createApp, ref, computed, onMounted, watch, nextTick, defineComponent } = Vue;
+
+    // --- Utility: Format Bytes ---
+    const formatBytes = (bytes, decimals = 2) => {
+        if (bytes === null || bytes === undefined) return '';
+        // 修正：如果 bytes 已经是包含单位的字符串（如 "77 GB"），则直接返回，不再解析
+        if (typeof bytes === 'string' && /[a-zA-Z]/.test(bytes)) return bytes;
+        
+        const parsed = parseInt(bytes);
+        if (isNaN(parsed)) return bytes || ''; 
+        if (parsed === 0) return '0 B';
+        
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+        const i = Math.floor(Math.log(parsed) / Math.log(k));
+        return `${parseFloat((parsed / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+    };
+
+    // --- Component: Tree Node (For 115) ---
+    const TreeNode = defineComponent({
+        name: 'TreeNode',
+        template: '#tree-node-template',
+        props: {
+            item: Object, 
+            shareLink: String,
+            password: { type: String, default: '' },
+            isRoot: { type: Boolean, default: false }
+        },
+        emits: ['notify'],
+        setup(props, { emit }) {
+            const isOpen = ref(false);
+            const loading = ref(false);
+            const children = ref([]);
+
+            const isISO = computed(() => {
+                return props.item.name && props.item.name.toLowerCase().endsWith('.iso');
+            });
+
+            const toggle = async () => {
+                if (props.item.is_dir && !isISO.value) {
+                    if (isOpen.value) {
+                        isOpen.value = false;
+                    } else {
+                        isOpen.value = true;
+                        if (children.value.length === 0) {
+                            await fetchChildren();
+                        }
+                    }
+                }
+            };
+
+            const fetchChildren = async () => {
+                loading.value = true;
+                try {
+                    const res = await fetch('/p115/share/list', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            share_link: props.shareLink,
+                            cid: props.item.id,
+                            password: props.password
+                        })
+                    });
+                    const json = await res.json();
+                    if (json.state) {
+                        let list = json.data.list;
+                        
+                        // 智能展平逻辑：如果是根节点且只有一个子文件夹，则自动获取该子文件夹的内容
+                        if (props.isRoot && list.length === 1 && list[0].is_dir) {
+                            const subRes = await fetch('/p115/share/list', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    share_link: props.shareLink,
+                                    cid: list[0].id, 
+                                    password: props.password
+                                })
+                            });
+                            const subJson = await subRes.json();
+                            if (subJson.state) {
+                                list = subJson.data.list;
+                            }
+                        }
+                        children.value = list;
+                    } else {
+                        emit('notify', { message: '加载目录失败: ' + json.message, type: 'error' });
+                        isOpen.value = false;
+                    }
+                } catch (e) {
+                    emit('notify', { message: '网络请求错误', type: 'error' });
+                    isOpen.value = false;
+                } finally {
+                    loading.value = false;
+                }
+            };
+
+            const onSave = async () => {
+                try {
+                    emit('notify', { message: '正在提交转存任务...', type: 'success' }); 
+                    const res = await fetch('/p115/share/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            share_link: props.shareLink,
+                            file_ids: [props.item.id],
+                            password: props.password
+                        })
+                    });
+                    const json = await res.json();
+                    if (json.state) {
+                        emit('notify', { message: '转存成功: ' + props.item.name, type: 'success' });
+                    } else {
+                        emit('notify', { message: '转存失败: ' + json.message, type: 'error' });
+                    }
+                } catch (e) {
+                    emit('notify', { message: '请求失败: ' + e.message, type: 'error' });
+                }
+            };
+
+            return { isOpen, loading, children, toggle, onSave, isISO, formatBytes };
+        }
+    });
 
     const CACHE_TTL = 8 * 60 * 60 * 1000;
     const cache = {
@@ -523,7 +742,7 @@
         }
     };
     const fetchWithCache = async (url) => {
-        const cacheKey = `fullbr_v5_${url}`;
+        const cacheKey = `fullbr_v6_${url}`;
         const cached = cache.get(cacheKey);
         if (cached) return cached;
         const res = await fetch(url);
@@ -546,8 +765,10 @@
 
     const ResourcePanel = {
         template: '#resource-panel-template',
+        components: { TreeNode },
         props: ['tmdbId', 'mediaType', 'seasonNumber', 'episodeNumber', 'availability', 'context', 'injected115'],
-        setup(props) {
+        emits: ['notify'],
+        setup(props, { emit }) {
             const activeTab = ref('');
             const localResources = ref([]);
             const loading = ref(false);
@@ -584,7 +805,27 @@
             });
 
             const isIso = (res) => (res.title || res.name || '').toLowerCase().endsWith('.iso');
-            const copyLink = (link) => navigator.clipboard.writeText(link).then(() => alert('已复制')).catch(() => alert('失败'));
+            const copyLink = (link) => navigator.clipboard.writeText(link).then(() => emit('notify', {message: '链接已复制', type:'success'})).catch(() => emit('notify', {message: '复制失败', type:'error'}));
+
+            const addOfflineTask = async (url) => {
+                if (!url) return;
+                emit('notify', { message: '正在添加离线任务...', type: 'success' });
+                try {
+                    const res = await fetch('/p115/offline/add', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ urls: [url] })
+                    });
+                    const json = await res.json();
+                    if (json.state) {
+                        emit('notify', { message: '离线任务添加成功', type: 'success' });
+                    } else {
+                        emit('notify', { message: '任务添加失败: ' + json.message, type: 'error' });
+                    }
+                } catch (e) {
+                    emit('notify', { message: '请求失败: ' + e.message, type: 'error' });
+                }
+            };
 
             const fetchLocalData = async () => {
                 loading.value = true;
@@ -633,7 +874,7 @@
                 }
             });
 
-            return { activeTab, displayResources, tabs, loading, copyLink, isIso };
+            return { activeTab, displayResources, tabs, loading, copyLink, isIso, addOfflineTask };
         }
     };
 
@@ -664,6 +905,10 @@
             const showEpisodeModal = ref(false);
             const currentEpisode = ref({});
 
+            // Toasts State
+            const toasts = ref([]);
+            let toastIdCounter = 0;
+
             const dateRanges = computed(() => {
                 const ranges = [];
                 ranges.push({ label: '1950前', start: '1900-01-01', end: '1949-12-31' });
@@ -678,7 +923,23 @@
                 return ranges.reverse();
             });
 
-            const toggleTheme = () => { /* ... */ }; // Impl omitted for brevity, same as before
+            const showToast = ({ message, type = 'success', duration = 3000 }) => {
+                const id = toastIdCounter++;
+                toasts.value.push({ id, message, type });
+                setTimeout(() => removeToast(id), duration);
+            };
+
+            const removeToast = (id) => {
+                const idx = toasts.value.findIndex(t => t.id === id);
+                if (idx !== -1) toasts.value.splice(idx, 1);
+            };
+
+            const toggleTheme = () => {
+                isDark.value = !isDark.value;
+                if (isDark.value) document.documentElement.classList.add('dark');
+                else document.documentElement.classList.remove('dark');
+            };
+
             const loadGenres = async () => {
                  try { const data = await fetchWithCache(`/tmdb/genres/${mediaType.value}`); genres.value = data; } catch (e) {}
             };
@@ -721,7 +982,7 @@
                 currentSeasonData.value = null;
                 selectedSeasonNumber.value = null;
                 raw115Resources.value = [];
-                seasonTabsRefs.value = {}; // Reset refs
+                seasonTabsRefs.value = {}; 
 
                 try {
                     const targetType = type || mediaType.value;
@@ -744,7 +1005,6 @@
                 selectedSeasonNumber.value = season.season_number;
                 currentSeasonData.value = null;
                 
-                // Scroll Logic
                 await nextTick();
                 const el = seasonTabsRefs.value[season.season_number];
                 if (el) {
@@ -757,7 +1017,6 @@
                 } catch(e) {}
             };
 
-            // Full Series 115 Calculation
             const fullSeries115 = computed(() => {
                 if (!detailData.value || !detailData.value.seasons || raw115Resources.value.length === 0) return [];
                 const validSeasons = detailData.value.seasons.filter(s => s.season_number > 0).map(s => `S${s.season_number}`);
@@ -768,18 +1027,14 @@
                 });
             });
 
-            // Specific Season 115 (Filtered to exclude full packs)
             const getCurrentSeason115 = (seasonNum) => {
                 if (raw115Resources.value.length === 0) return [];
                 
-                // Identify Full Series Links to Exclude
                 const fullSeriesLinks = new Set(fullSeries115.value.map(r => r.link));
-
                 const targetS = `S${seasonNum}`;
                 const validSeasonsCount = detailData.value.seasons.filter(s => s.season_number > 0).length;
 
                 return raw115Resources.value.filter(res => {
-                    // Must include current season AND not be a full pack
                     return res.season_list && res.season_list.includes(targetS) && !fullSeriesLinks.has(res.link);
                 }).map(res => {
                     const newRes = { ...res };
@@ -804,7 +1059,7 @@
             const closeEpisodeModal = () => showEpisodeModal.value = false;
 
             onMounted(() => {
-                if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
                     isDark.value = true;
                     document.documentElement.classList.add('dark');
                 } else { isDark.value = false; }
@@ -820,7 +1075,8 @@
                 selectedSeasonNumber, currentSeasonData, selectSeason,
                 showEpisodeModal, openEpisodeModal, closeEpisodeModal, currentEpisode, showMobileSearch,
                 fullSeries115, getCurrentSeason115,
-                seasonTabsContainer, seasonTabsRefs // Return refs
+                seasonTabsContainer, seasonTabsRefs,
+                toasts, showToast, removeToast
             };
         }
     }).mount('#app');
