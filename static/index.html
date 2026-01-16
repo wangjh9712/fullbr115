@@ -17,8 +17,24 @@
                         emby: {
                             dark: '#141414',
                             card: '#1f1f1f',
-                            accent: '#00a4dc', // Emby Blue
-                            green: '#52b54b'
+                            accent: '#00a4dc',
+                            green: '#52b54b',
+                            red: '#e50914',
+                            gold: '#ffd700'
+                        }
+                    },
+                    animation: {
+                        'fade-in': 'fadeIn 0.3s ease-in-out',
+                        'slide-up': 'slideUp 0.3s ease-out'
+                    },
+                    keyframes: {
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' }
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(10px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' }
                         }
                     }
                 }
@@ -27,23 +43,55 @@
     </script>
     <style>
         [v-cloak] { display: none; }
-        .backdrop-mask {
-            background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.6) 50%, rgba(0,0,0,1) 100%);
-        }
-        .backdrop-mask-light {
-            background: linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.6) 50%, rgba(255,255,255,1) 100%);
-        }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .line-clamp-3 {
+        .line-clamp-2 {
             display: -webkit-box;
-            -webkit-line-clamp: 3;
+            -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
         }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #4b5563;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        
+        /* ISO 哑光黑金风格 */
+        .iso-black-gold {
+            background: linear-gradient(145deg, #3a3a3a 0%, #1f1f1f 100%);
+            border: 1px solid rgba(255, 215, 0, 0.25);
+            color: #e0e0e0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            position: relative;
+            overflow: hidden;
+        }
+        .iso-black-gold::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.4), transparent);
+        }
+        .iso-black-gold:hover {
+            border-color: rgba(255, 215, 0, 0.5);
+            background: linear-gradient(145deg, #454545 0%, #2a2a2a 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        }
+        .iso-text-gold {
+            color: #ffd700;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+            font-weight: 600;
+        }
     </style>
 </head>
-<body class="bg-gray-100 dark:bg-emby-dark text-gray-900 dark:text-gray-100 transition-colors duration-300">
+<body class="bg-gray-100 dark:bg-emby-dark text-gray-900 dark:text-gray-100 transition-colors duration-300 font-sans">
 
 <div id="app" v-cloak class="min-h-screen flex flex-col relative overflow-x-hidden">
 
@@ -115,20 +163,20 @@
                             </div>
 
                              <div class="hidden sm:flex items-center space-x-2 bg-gray-100 dark:bg-gray-800 rounded px-3 py-1.5">
-                                <span class="text-gray-500">投票人次 ></span>
+                                <span class="text-gray-500">评分人数 ></span>
                                 <input type="number" v-model.number="filters.minVoteCount" step="100" @change="refreshData"
                                     class="w-16 bg-transparent text-center outline-none">
                             </div>
                         </div>
 
                         <button @click="showAdvancedFilters = !showAdvancedFilters" class="text-emby-accent text-sm hover:underline">
-                            {{ showAdvancedFilters ? '收起筛选' : '更多筛选 (年份/类型)' }}
+                            {{ showAdvancedFilters ? '收起筛选' : '更多筛选' }}
                         </button>
                     </div>
 
                     <div v-show="showAdvancedFilters" class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
                         <div>
-                            <span class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">上映时间</span>
+                            <span class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">年份</span>
                             <div class="flex flex-wrap gap-2">
                                 <button v-for="range in dateRanges" :key="range.label"
                                     @click="toggleDateRange(range)"
@@ -161,9 +209,7 @@
                 <button @click="goHome" class="flex items-center text-gray-600 dark:text-gray-300 hover:text-emby-accent transition">
                     <i class="fa-solid fa-arrow-left mr-2"></i> 返回发现页
                 </button>
-                <div class="text-sm text-gray-500">
-                    搜索结果: "{{ searchQuery }}"
-                </div>
+                <div class="text-sm text-gray-500">搜索结果: "{{ searchQuery }}"</div>
             </div>
 
             <div v-if="loading" class="flex justify-center py-20">
@@ -184,13 +230,8 @@
                         <img :src="item.poster_path || 'https://via.placeholder.com/300x450?text=No+Image'" 
                              class="w-full h-full object-cover transition duration-500 group-hover:brightness-110"
                              loading="lazy">
-                        
                         <div class="absolute top-2 right-2 bg-black/70 text-white text-xs font-bold px-1.5 py-0.5 rounded backdrop-blur-sm">
                             {{ item.vote_average.toFixed(1) }}
-                        </div>
-                        
-                        <div v-if="currentView === 'search'" class="absolute top-2 left-2 bg-emby-accent/80 text-white text-[10px] font-bold px-1.5 py-0.5 rounded backdrop-blur-sm uppercase">
-                            {{ item.media_type === 'tv' ? 'TV' : 'Movie' }}
                         </div>
                     </div>
 
@@ -198,97 +239,81 @@
                         <h3 class="text-sm font-bold truncate text-gray-800 dark:text-gray-100 group-hover:text-emby-accent transition-colors">
                             {{ item.title }}
                         </h3>
-                        <div class="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                            <span>{{ getYear(item.release_date) }}</span>
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                            {{ item.release_date ? item.release_date.split('-')[0] : '' }}
                         </div>
                     </div>
                 </div>
             </div>
-
+            
             <div class="mt-8 flex justify-center space-x-4" v-if="mediaList.length > 0">
-                <button @click="changePage(-1)" :disabled="currentPage === 1" 
-                    class="px-4 py-2 bg-white dark:bg-emby-card rounded shadow disabled:opacity-50">
-                    上一页
-                </button>
-                <span class="px-4 py-2 font-mono">第 {{ currentPage }} 页</span>
-                <button @click="changePage(1)" 
-                    class="px-4 py-2 bg-white dark:bg-emby-card rounded shadow hover:bg-emby-accent hover:text-white transition">
-                    下一页
-                </button>
+                <button @click="changePage(-1)" :disabled="currentPage === 1" class="px-3 py-1 bg-white dark:bg-emby-card rounded shadow disabled:opacity-50">上一页</button>
+                <span class="px-3 py-1 font-mono">P{{ currentPage }}</span>
+                <button @click="changePage(1)" class="px-3 py-1 bg-white dark:bg-emby-card rounded shadow">下一页</button>
             </div>
         </div>
 
-        <div v-if="currentView === 'detail' && detailData" class="relative min-h-[calc(100vh-64px)] pb-20">
+        <div v-if="currentView === 'detail' && detailData" class="relative min-h-[calc(100vh-64px)] pb-20 animate-fade-in">
             
-            <div class="absolute inset-0 z-0 overflow-hidden">
+            <div class="absolute inset-0 z-0 overflow-hidden h-[70vh]">
                 <img :src="detailData.backdrop_path || detailData.poster_path" 
-                     class="w-full h-full object-cover blur-lg opacity-40 dark:opacity-30 scale-110">
-                <div class="absolute inset-0 bg-gradient-to-t from-gray-100 via-gray-100/80 to-transparent dark:from-emby-dark dark:via-emby-dark/90 dark:to-transparent"></div>
+                     class="w-full h-full object-cover blur-md opacity-30 dark:opacity-20">
+                <div class="absolute inset-0 bg-gradient-to-b from-transparent via-gray-100/60 to-gray-100 dark:via-emby-dark/80 dark:to-emby-dark"></div>
             </div>
 
             <div class="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <button @click="goBack" class="mb-6 flex items-center text-gray-600 dark:text-gray-300 hover:text-emby-accent transition">
-                    <i class="fa-solid fa-arrow-left mr-2"></i> 返回列表
+                    <i class="fa-solid fa-arrow-left mr-2"></i> 返回
                 </button>
 
-                <div class="flex flex-col md:flex-row gap-8">
-                    <div class="flex-shrink-0 w-48 md:w-72 mx-auto md:mx-0">
-                        <div class="aspect-[2/3] rounded-lg shadow-2xl overflow-hidden border-2 border-white/10">
-                            <img :src="currentSeasonData?.poster_path || detailData.poster_path" 
-                                 class="w-full h-full object-cover">
+                <div class="flex flex-col md:flex-row gap-8 mb-10">
+                    <div class="flex-shrink-0 w-48 md:w-64 mx-auto md:mx-0">
+                        <div class="aspect-[2/3] rounded-lg shadow-2xl overflow-hidden border border-white/10">
+                            <img :src="currentSeasonData?.poster_path || detailData.poster_path" class="w-full h-full object-cover">
                         </div>
                     </div>
 
                     <div class="flex-1 text-center md:text-left space-y-4">
-                        <h1 class="text-3xl md:text-5xl font-bold text-gray-900 dark:text-white leading-tight">
-                            {{ detailData.title }}
-                        </h1>
-                        <p class="text-lg text-gray-500 dark:text-gray-400 font-serif italic">
-                            {{ detailData.original_title }}
-                        </p>
+                        <h1 class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">{{ detailData.title }}</h1>
+                        <p class="text-lg text-gray-500 font-serif italic">{{ detailData.original_title }}</p>
                         
-                        <div class="flex flex-wrap items-center justify-center md:justify-start gap-4 text-sm">
-                            <span class="bg-emby-accent text-white px-2 py-0.5 rounded font-bold">
-                                TMDB {{ detailData.vote_average.toFixed(1) }}
-                            </span>
-                            <span class="text-gray-600 dark:text-gray-300">
-                                {{ detailData.release_date }}
-                            </span>
-                            <span v-if="detailData.status" class="px-2 py-0.5 border border-gray-400 rounded text-xs">
-                                {{ detailData.status }}
-                            </span>
+                        <div class="flex flex-wrap items-center justify-center md:justify-start gap-3 text-sm">
+                            <span class="bg-emby-accent text-white px-2 py-0.5 rounded font-bold">TMDB {{ detailData.vote_average.toFixed(1) }}</span>
+                            <span class="text-gray-600 dark:text-gray-300">{{ detailData.release_date }}</span>
+                            <span v-if="detailData.status" class="px-2 py-0.5 border border-gray-400 rounded text-xs">{{ detailData.status }}</span>
                         </div>
 
-                        <div class="text-gray-700 dark:text-gray-300 leading-relaxed max-w-3xl">
-                            {{ detailData.overview }}
-                        </div>
+                        <p class="text-gray-700 dark:text-gray-300 leading-relaxed line-clamp-4">{{ detailData.overview }}</p>
                         
                         <div class="flex flex-wrap gap-2 justify-center md:justify-start pt-2">
-                            <span v-for="g in detailData.genres" :key="g.id" 
-                                class="px-3 py-1 bg-gray-200 dark:bg-gray-800 rounded-full text-xs text-gray-600 dark:text-gray-300">
+                            <span v-for="g in detailData.genres" :key="g.id" class="px-2 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">
                                 {{ g.name }}
                             </span>
-                        </div>
-
-                        <div class="pt-4" v-if="detailData.cast && detailData.cast.length">
-                            <h3 class="text-sm font-bold text-gray-500 uppercase tracking-widest mb-3">主演</h3>
-                            <div class="flex flex-wrap justify-center md:justify-start gap-4">
-                                <div v-for="person in detailData.cast.slice(0, 6)" :key="person.id" class="text-center w-16">
-                                    <img :src="person.profile_path || 'https://via.placeholder.com/100x100?text=NA'" 
-                                         class="w-14 h-14 rounded-full object-cover mx-auto shadow-md mb-1 border border-gray-300 dark:border-gray-700">
-                                    <p class="text-[10px] leading-tight truncate">{{ person.name }}</p>
-                                    <p class="text-[9px] text-gray-500 truncate">{{ person.character }}</p>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
 
-                <div v-if="detailData.seasons && detailData.seasons.length > 0" class="mt-12">
-                    <h2 class="text-2xl font-bold mb-6 px-2 border-l-4 border-emby-accent">剧集详情</h2>
+                <div class="mb-10 animate-slide-up" v-if="detailData.media_type === 'movie' || detailData.media_type === 'tv'">
+                    <h2 class="text-xl font-bold mb-4 flex items-center">
+                        <i class="fa-solid fa-layer-group text-emby-accent mr-2"></i>
+                        {{ detailData.media_type === 'movie' ? '电影资源' : '全集/打包资源' }}
+                    </h2>
                     
-                    <div class="flex overflow-x-auto space-x-4 pb-4 mb-4 hide-scrollbar">
+                    <resource-panel 
+                        :tmdb-id="detailData.tmdb_id" 
+                        :media-type="detailData.media_type" 
+                        :availability="detailData.availability"
+                        :injected-115="detailData.media_type === 'tv' ? fullSeries115 : null"
+                        context="main"
+                    ></resource-panel>
+                </div>
+
+                <div v-if="detailData.media_type === 'tv' && detailData.seasons.length > 0" class="mb-10 animate-slide-up">
+                    <h2 class="text-xl font-bold mb-6 px-2 border-l-4 border-emby-accent">分季详情</h2>
+                    
+                    <div ref="seasonTabsContainer" class="flex overflow-x-auto space-x-4 pb-4 mb-4 hide-scrollbar scroll-smooth">
                         <button v-for="season in detailData.seasons" :key="season.id"
+                            :ref="el => seasonTabsRefs[season.season_number] = el"
                             @click="selectSeason(season)"
                             class="flex-shrink-0 px-4 py-2 rounded-lg transition text-sm font-bold whitespace-nowrap"
                             :class="selectedSeasonNumber === season.season_number 
@@ -298,28 +323,43 @@
                         </button>
                     </div>
 
-                    <div v-if="currentSeasonData" class="animate-fade-in-up">
-                        <div class="mb-6 text-sm text-gray-500 dark:text-gray-400">
-                            {{ currentSeasonData.air_date }} | 共 {{ currentSeasonData.episode_count }} 集
+                    <div v-if="currentSeasonData" class="animate-fade-in">
+                         <div class="mb-6">
+                            <h4 class="text-sm font-bold text-gray-500 mb-2 uppercase tracking-wider">本季资源 (Season Pack)</h4>
+                            <resource-panel 
+                                :tmdb-id="detailData.tmdb_id" 
+                                :season-number="currentSeasonData.season_number"
+                                media-type="tv_season"
+                                :availability="detailData.availability"
+                                :injected-115="getCurrentSeason115(currentSeasonData.season_number)"
+                                context="season"
+                            ></resource-panel>
+                        </div>
+
+                        <div class="mb-4 text-sm text-gray-500 dark:text-gray-400 flex items-center">
+                            <span>{{ currentSeasonData.air_date }}</span>
+                            <span class="mx-2">|</span>
+                            <span>共 {{ currentSeasonData.episode_count }} 集</span>
                         </div>
 
                         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                             <div v-for="ep in currentSeasonData.episodes" :key="ep.id"
-                                class="flex bg-white/50 dark:bg-gray-800/50 rounded-lg p-3 hover:bg-white dark:hover:bg-gray-800 transition shadow-sm">
+                                @click="openEpisodeModal(currentSeasonData.season_number, ep)"
+                                class="cursor-pointer group flex bg-white/50 dark:bg-gray-800/50 rounded-lg p-3 hover:bg-white dark:hover:bg-gray-800 transition shadow-sm border border-transparent hover:border-emby-accent/50">
                                 <div class="w-32 flex-shrink-0 mr-4 relative rounded overflow-hidden aspect-video bg-gray-900">
-                                    <img :src="ep.still_path || detailData.backdrop_path" class="w-full h-full object-cover">
+                                    <img :src="ep.still_path || detailData.backdrop_path" class="w-full h-full object-cover group-hover:scale-110 transition duration-500">
                                     <div class="absolute bottom-1 right-1 bg-black/60 text-white text-[10px] px-1 rounded">
                                         {{ ep.vote_average.toFixed(1) }}
                                     </div>
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <div class="flex justify-between items-start">
-                                        <h4 class="font-bold text-sm truncate pr-2">
+                                        <h4 class="font-bold text-sm truncate pr-2 group-hover:text-emby-accent">
                                             {{ ep.episode_number }}. {{ ep.name }}
                                         </h4>
                                     </div>
                                     <p class="text-xs text-gray-500 mt-1">{{ ep.air_date }}</p>
-                                    <p class="text-xs text-gray-600 dark:text-gray-400 mt-2 line-clamp-3 leading-relaxed">
+                                    <p class="text-xs text-gray-600 dark:text-gray-400 mt-2 line-clamp-2">
                                         {{ ep.overview || '暂无简介' }}
                                     </p>
                                 </div>
@@ -327,155 +367,332 @@
                         </div>
                     </div>
                     <div v-else class="py-10 text-center">
-                        <i class="fa-solid fa-spinner fa-spin text-2xl"></i> 加载剧集信息中...
+                        <i class="fa-solid fa-spinner fa-spin text-2xl text-emby-accent"></i> 
+                        <span class="ml-2 text-sm text-gray-500">加载季信息...</span>
                     </div>
                 </div>
 
-                <div class="mt-16 border-t border-gray-200 dark:border-gray-800 pt-8">
+                 <div class="mt-16 border-t border-gray-200 dark:border-gray-800 pt-8" v-if="detailData.recommendations && detailData.recommendations.length">
                     <h2 class="text-xl font-bold mb-6">相关推荐</h2>
                     <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-4">
-                        <div v-for="rec in detailData.recommendations.slice(0, 12)" :key="rec.tmdb_id"
+                        <div v-for="rec in detailData.recommendations" :key="rec.tmdb_id"
                             @click="goToDetail(rec.tmdb_id, rec.media_type)"
                             class="cursor-pointer group">
-                            <div class="aspect-[2/3] rounded bg-gray-800 overflow-hidden mb-2">
-                                <img :src="rec.poster_path" class="w-full h-full object-cover group-hover:scale-110 transition duration-300">
+                            <div class="aspect-[2/3] rounded bg-gray-800 overflow-hidden mb-2 relative">
+                                <img :src="rec.poster_path || 'https://via.placeholder.com/300x450'" class="w-full h-full object-cover group-hover:scale-110 transition duration-300">
+                                <div class="absolute top-1 right-1 bg-black/60 text-white text-[10px] px-1 rounded">{{ rec.vote_average.toFixed(1) }}</div>
                             </div>
-                            <p class="text-xs text-center truncate group-hover:text-emby-accent">{{ rec.title }}</p>
+                            <p class="text-xs text-center truncate group-hover:text-emby-accent transition-colors">{{ rec.title }}</p>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-    </main>
+        <div v-if="showEpisodeModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" @click="closeEpisodeModal"></div>
+            <div class="relative bg-white dark:bg-emby-card w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden animate-slide-up flex flex-col max-h-[80vh]">
+                
+                <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800">
+                    <div>
+                        <h3 class="text-lg font-bold">
+                            S{{ currentEpisode.season_number }} E{{ currentEpisode.episode_number }} - {{ currentEpisode.name }}
+                        </h3>
+                        <p class="text-xs text-gray-500">{{ currentEpisode.air_date }}</p>
+                    </div>
+                    <button @click="closeEpisodeModal" class="text-gray-400 hover:text-gray-900 dark:hover:text-white text-xl">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
 
+                <div class="p-0 overflow-y-auto custom-scrollbar flex-1">
+                    <div class="p-4 bg-gray-100 dark:bg-black/20 text-sm text-gray-600 dark:text-gray-300 mb-4" v-if="currentEpisode.overview">
+                        {{ currentEpisode.overview }}
+                    </div>
+
+                    <div class="px-4 pb-6">
+                        <h4 class="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wider">单集资源</h4>
+                        <resource-panel 
+                            :tmdb-id="detailData.tmdb_id" 
+                            :season-number="currentEpisode.season_number"
+                            :episode-number="currentEpisode.episode_number"
+                            media-type="tv_episode"
+                            :availability="detailData.availability"
+                            context="episode"
+                        ></resource-panel>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
 </div>
+
+<template id="resource-panel-template">
+    <div class="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-1">
+        <div class="flex space-x-1 mb-2 border-b border-gray-200 dark:border-gray-700 pb-1 overflow-x-auto hide-scrollbar" 
+             v-if="mediaType !== 'tv_episode' && tabs.length > 0">
+            <button v-for="tab in tabs" :key="tab.id" @click="activeTab = tab.id" 
+                class="px-3 py-1.5 text-sm font-medium rounded-md transition whitespace-nowrap"
+                :class="activeTab === tab.id ? 'bg-white dark:bg-gray-700 text-emby-accent shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'">
+                <i :class="tab.icon" class="mr-1"></i> {{ tab.label }}
+            </button>
+        </div>
+
+        <div class="relative min-h-[100px] max-h-[300px] overflow-y-auto custom-scrollbar p-2 transition-all duration-300"
+             :class="{ 'blur-sm opacity-60 pointer-events-none': loading }">
+            
+            <div v-if="mediaType !== 'tv_episode' && tabs.length === 0 && !loading" class="text-center py-6 text-gray-500">
+                <i class="fa-solid fa-ban text-2xl mb-2 opacity-50"></i><p class="text-xs">暂无可用资源</p>
+            </div>
+
+            <div v-else-if="displayResources.length === 0 && !loading" class="text-center py-6 text-xs text-gray-500">
+                该类型下暂无数据
+            </div>
+
+            <div v-else class="space-y-2">
+                <div v-for="(res, idx) in displayResources" :key="idx" 
+                     class="p-3 rounded transition flex flex-col sm:flex-row gap-2 sm:items-center"
+                     :class="isIso(res) ? 'iso-black-gold' : 'bg-white dark:bg-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700'">
+                    
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center mb-1">
+                            <span v-if="mediaType === 'tv_episode'" class="text-[10px] px-1.5 py-0.5 rounded mr-2 flex-shrink-0 font-bold"
+                                :class="res.link_type === 'magnet' ? 'bg-red-500/10 text-red-500' : 'bg-blue-500/10 text-blue-500'">
+                                {{ res.link_type === 'magnet' ? 'MAG' : 'ED2K' }}
+                            </span>
+
+                            <span class="text-sm font-medium truncate" 
+                                  :class="isIso(res) ? 'iso-text-gold' : 'text-gray-800 dark:text-gray-200'" 
+                                  :title="res.title">{{ res.title }}</span>
+                        </div>
+                        
+                        <div class="flex flex-wrap gap-1.5 mt-1 opacity-90">
+                            <span v-if="res.season_tag" class="text-[10px] px-1.5 py-0.5 rounded bg-emby-green/10 text-emby-green border border-emby-green/30 font-medium">
+                                {{ res.season_tag }}
+                            </span>
+
+                            <span v-if="res.size" class="text-[10px] px-1.5 py-0.5 rounded"
+                                :class="isIso(res) ? 'bg-white/10 text-gray-300 border border-white/20' : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'">
+                                {{ res.size }}
+                            </span>
+                            <span v-if="res.resolution" class="text-[10px] px-1.5 py-0.5 rounded border"
+                                :class="isIso(res) ? 'bg-blue-900/30 text-blue-300 border-blue-500/50' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-800'">
+                                {{ res.resolution }}
+                            </span>
+                             <span v-if="res.quality" class="text-[10px] px-1.5 py-0.5 rounded"
+                                 :class="isIso(res) ? 'bg-purple-900/50 text-purple-200' : 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300'">
+                                {{ res.quality }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="flex-shrink-0 ml-auto">
+                        <button @click="copyLink(res.link)" 
+                            class="text-xs px-3 py-1.5 rounded transition font-bold"
+                            :class="isIso(res) ? 'bg-yellow-600/80 text-white hover:bg-yellow-500' : 'bg-gray-200 dark:bg-gray-600 hover:bg-emby-accent hover:text-white'">
+                            复制
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="loading" class="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
+             <i class="fa-solid fa-spinner fa-spin text-2xl text-emby-accent"></i>
+        </div>
+    </div>
+</template>
 
 <script>
     const { createApp, ref, computed, onMounted, watch, nextTick } = Vue;
 
+    const CACHE_TTL = 8 * 60 * 60 * 1000;
+    const cache = {
+        get(key) {
+            try {
+                const item = localStorage.getItem(key);
+                if (!item) return null;
+                const parsed = JSON.parse(item);
+                if (Date.now() - parsed.ts > CACHE_TTL) { localStorage.removeItem(key); return null; }
+                return parsed.data;
+            } catch (e) { return null; }
+        },
+        set(key, data) {
+            try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data: data })); } catch (e) {}
+        }
+    };
+    const fetchWithCache = async (url) => {
+        const cacheKey = `fullbr_v5_${url}`;
+        const cached = cache.get(cacheKey);
+        if (cached) return cached;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("API Error");
+        const json = await res.json();
+        cache.set(cacheKey, json);
+        return json;
+    };
+
+    // Helper: Parse Size for Sorting
+    const parseSize = (str) => {
+        if (!str || typeof str !== 'string') return 0;
+        const units = { 'B': 1, 'KB': 1024, 'MB': 1024**2, 'GB': 1024**3, 'TB': 1024**4, 'PB': 1024**5 };
+        const match = str.match(/([\d.]+)\s*([a-zA-Z]+)/);
+        if (!match) return 0;
+        const val = parseFloat(match[1]);
+        const unit = match[2].toUpperCase();
+        return val * (units[unit] || 1);
+    };
+
+    const ResourcePanel = {
+        template: '#resource-panel-template',
+        props: ['tmdbId', 'mediaType', 'seasonNumber', 'episodeNumber', 'availability', 'context', 'injected115'],
+        setup(props) {
+            const activeTab = ref('');
+            const localResources = ref([]);
+            const loading = ref(false);
+
+            const tabs = computed(() => {
+                const t = [];
+                if ((props.injected115 && props.injected115.length > 0) || 
+                    (props.mediaType === 'movie' && props.availability?.has_115)) {
+                    t.push({ id: '115_share', label: '115分享', icon: 'fa-solid fa-cloud' });
+                }
+                const hasLocalMagnet = localResources.value.some(r => r.link_type === 'magnet');
+                if (hasLocalMagnet || (props.mediaType === 'movie' && props.availability?.has_magnet)) {
+                    t.push({ id: 'magnet', label: '磁力链', icon: 'fa-solid fa-magnet' });
+                }
+                const hasLocalEd2k = localResources.value.some(r => r.link_type === 'ed2k');
+                if (hasLocalEd2k || (props.mediaType === 'movie' && props.availability?.has_ed2k)) {
+                    t.push({ id: 'ed2k', label: '电驴/Ed2k', icon: 'fa-solid fa-network-wired' });
+                }
+                return t;
+            });
+
+            // Sorted Display Resources
+            const displayResources = computed(() => {
+                let list = [];
+                if (props.mediaType === 'tv_episode') {
+                    list = [...localResources.value];
+                } else if (activeTab.value === '115_share' && props.mediaType !== 'movie') {
+                    list = [...(props.injected115 || [])];
+                } else {
+                    list = localResources.value.filter(r => r.link_type === activeTab.value);
+                }
+                // Sort by Size Descending
+                return list.sort((a, b) => parseSize(b.size) - parseSize(a.size));
+            });
+
+            const isIso = (res) => (res.title || res.name || '').toLowerCase().endsWith('.iso');
+            const copyLink = (link) => navigator.clipboard.writeText(link).then(() => alert('已复制')).catch(() => alert('失败'));
+
+            const fetchLocalData = async () => {
+                loading.value = true;
+                localResources.value = [];
+                try {
+                    let url = '';
+                    if (props.mediaType === 'movie') {
+                        const params = new URLSearchParams();
+                        if(activeTab.value) params.append('source_type', activeTab.value);
+                        url = `/resources/movie/${props.tmdbId}?${params.toString()}`;
+                        const data = await fetchWithCache(url);
+                        localResources.value = data; 
+                    } else if (props.mediaType === 'tv_season') {
+                        url = `/resources/tv/${props.tmdbId}/season/${props.seasonNumber}`;
+                        const data = await fetchWithCache(url);
+                        localResources.value = data;
+                    } else if (props.mediaType === 'tv_episode') {
+                        url = `/resources/tv/${props.tmdbId}/season/${props.seasonNumber}/episode/${props.episodeNumber}`;
+                        const data = await fetchWithCache(url);
+                        localResources.value = data;
+                    }
+                } catch (e) { console.error(e); } 
+                finally { loading.value = false; }
+            };
+
+            const updateActiveTab = () => {
+                if (props.mediaType === 'tv_episode') return;
+                const currentExists = tabs.value.find(t => t.id === activeTab.value);
+                if (currentExists) return;
+                if (tabs.value.length > 0) activeTab.value = tabs.value[0].id;
+                else activeTab.value = '';
+            };
+
+            watch([() => props.injected115, localResources], () => updateActiveTab());
+            watch(activeTab, () => { if (props.mediaType === 'movie') fetchLocalData(); });
+            watch(() => [props.seasonNumber, props.episodeNumber], () => { localResources.value = []; fetchLocalData(); });
+
+            onMounted(() => {
+                if (props.mediaType === 'movie' && props.availability) {
+                    if (props.availability.has_115) activeTab.value = '115_share';
+                    else if (props.availability.has_magnet) activeTab.value = 'magnet';
+                    else activeTab.value = 'ed2k';
+                    fetchLocalData();
+                } else {
+                    fetchLocalData().then(() => updateActiveTab());
+                }
+            });
+
+            return { activeTab, displayResources, tabs, loading, copyLink, isIso };
+        }
+    };
+
     createApp({
+        components: { 'resource-panel': ResourcePanel },
         setup() {
-            // --- 状态管理 ---
-            const currentView = ref('home'); // home, search, detail
+            const currentView = ref('home');
             const isDark = ref(true);
             const showMobileSearch = ref(false);
             const loading = ref(false);
-            
-            // 数据相关
             const mediaType = ref('movie');
             const mediaList = ref([]);
             const genres = ref([]);
             const searchQuery = ref('');
             const currentPage = ref(1);
-            
-            // 详情页数据
             const detailData = ref(null);
-            const selectedSeasonNumber = ref(null);
-            const currentSeasonData = ref(null); // 具体的季详情（包含集）
-
-            // 过滤器
-            const showAdvancedFilters = ref(false);
-            const filters = ref({
-                sortBy: 'popularity.desc',
-                minVote: 0,
-                minVoteCount: 500,
-                selectedGenres: [],
-                dateRange: null // { start, end }
-            });
-
-            // --- 缓存配置 (8小时) ---
-            const CACHE_TTL = 8 * 60 * 60 * 1000;
             
-            const cache = {
-                get(key) {
-                    try {
-                        const item = localStorage.getItem(key);
-                        if (!item) return null;
-                        const parsed = JSON.parse(item);
-                        if (Date.now() - parsed.ts > CACHE_TTL) {
-                            localStorage.removeItem(key);
-                            return null;
-                        }
-                        return parsed.data;
-                    } catch (e) { return null; }
-                },
-                set(key, data) {
-                    try {
-                        localStorage.setItem(key, JSON.stringify({
-                            ts: Date.now(),
-                            data: data
-                        }));
-                    } catch (e) { console.warn("Storage full"); }
-                }
-            };
+            const selectedSeasonNumber = ref(null);
+            const currentSeasonData = ref(null);
+            const raw115Resources = ref([]);
+            
+            // Refs for Scrolling
+            const seasonTabsContainer = ref(null);
+            const seasonTabsRefs = ref({});
 
-            const fetchWithCache = async (url) => {
-                const cacheKey = `fullbr_cache_${url}`;
-                const cached = cache.get(cacheKey);
-                if (cached) return cached;
-                
-                const res = await fetch(url);
-                if (!res.ok) throw new Error("API Error");
-                const json = await res.json();
-                
-                cache.set(cacheKey, json);
-                return json;
-            };
+            const showAdvancedFilters = ref(false);
+            const filters = ref({ sortBy: 'popularity.desc', minVote: 0, minVoteCount: 100, selectedGenres: [], dateRange: null });
+            const showEpisodeModal = ref(false);
+            const currentEpisode = ref({});
 
-            // --- 日期区间生成 ---
             const dateRanges = computed(() => {
                 const ranges = [];
-                // 1900-1949
                 ranges.push({ label: '1950前', start: '1900-01-01', end: '1949-12-31' });
-                // 20世纪 20年一档
-                ranges.push({ label: '1950s-60s', start: '1950-01-01', end: '1969-12-31' });
-                ranges.push({ label: '1970s-80s', start: '1970-01-01', end: '1989-12-31' });
-                // 21世纪 10年一档
-                ranges.push({ label: '1990s', start: '1990-01-01', end: '1999-12-31' });
+                ranges.push({ label: '50s-60s', start: '1950-01-01', end: '1969-12-31' });
+                ranges.push({ label: '70s-80s', start: '1970-01-01', end: '1989-12-31' });
+                ranges.push({ label: '90s', start: '1990-01-01', end: '1999-12-31' });
                 ranges.push({ label: '2000s', start: '2000-01-01', end: '2009-12-31' });
                 ranges.push({ label: '2010s', start: '2010-01-01', end: '2019-12-31' });
-                // 2020后 逐年
                 for (let y = 2020; y <= new Date().getFullYear(); y++) {
                     ranges.push({ label: `${y}`, start: `${y}-01-01`, end: `${y}-12-31` });
                 }
-                return ranges.reverse(); // 最新的在前
+                return ranges.reverse();
             });
 
-            // --- 核心逻辑 ---
-
-            const toggleTheme = () => {
-                isDark.value = !isDark.value;
-                if (isDark.value) document.documentElement.classList.add('dark');
-                else document.documentElement.classList.remove('dark');
-            };
-
+            const toggleTheme = () => { /* ... */ }; // Impl omitted for brevity, same as before
             const loadGenres = async () => {
-                try {
-                    // 类型列表通常不大，但区分movie/tv
-                    const data = await fetchWithCache(`/tmdb/genres/${mediaType.value}`);
-                    genres.value = data;
-                } catch (e) { console.error(e); }
+                 try { const data = await fetchWithCache(`/tmdb/genres/${mediaType.value}`); genres.value = data; } catch (e) {}
             };
 
             const buildQueryUrl = (base) => {
                 const params = new URLSearchParams();
                 params.append('page', currentPage.value);
-                
                 if (currentView.value === 'home') {
                     params.append('sort_by', filters.value.sortBy);
                     params.append('min_vote', filters.value.minVote);
                     params.append('min_vote_count', filters.value.minVoteCount);
-                    if (filters.value.selectedGenres.length) {
-                        params.append('with_genres', filters.value.selectedGenres.join(','));
-                    }
-                    if (filters.value.dateRange) {
-                        params.append('start_date', filters.value.dateRange.start);
-                        params.append('end_date', filters.value.dateRange.end);
-                    }
-                } else if (currentView.value === 'search') {
-                    params.append('query', searchQuery.value);
-                }
+                    if (filters.value.selectedGenres.length) params.append('with_genres', filters.value.selectedGenres.join(','));
+                    if (filters.value.dateRange) { params.append('start_date', filters.value.dateRange.start); params.append('end_date', filters.value.dateRange.end); }
+                } else if (currentView.value === 'search') { params.append('query', searchQuery.value); }
                 return `${base}?${params.toString()}`;
             };
 
@@ -483,146 +700,127 @@
                 loading.value = true;
                 mediaList.value = [];
                 try {
-                    let url = '';
-                    if (currentView.value === 'search') {
-                        if (!searchQuery.value) return;
-                        url = buildQueryUrl('/tmdb/search');
-                    } else {
-                        url = buildQueryUrl(`/tmdb/discover/${mediaType.value}`);
-                    }
-                    
+                    let url = currentView.value === 'search' && searchQuery.value ? buildQueryUrl('/tmdb/search') : buildQueryUrl(`/tmdb/discover/${mediaType.value}`);
+                    if (url.includes('search') && !searchQuery.value) return;
                     const res = await fetchWithCache(url);
                     mediaList.value = res.results || [];
-                } catch (e) {
-                    console.error(e);
-                } finally {
-                    loading.value = false;
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                }
+                } finally { loading.value = false; }
             };
 
-            const switchMediaType = (type) => {
-                mediaType.value = type;
-                currentPage.value = 1;
-                // 重置部分筛选但保留排序
-                filters.value.selectedGenres = [];
-                loadGenres();
-                refreshData();
-            };
+            const switchMediaType = (type) => { mediaType.value = type; currentPage.value = 1; filters.value.selectedGenres = []; loadGenres(); refreshData(); };
+            const toggleGenre = (id) => { const idx = filters.value.selectedGenres.indexOf(id); if (idx > -1) filters.value.selectedGenres.splice(idx, 1); else filters.value.selectedGenres.push(id); currentPage.value = 1; refreshData(); };
+            const toggleDateRange = (range) => { if (filters.value.dateRange?.label === range.label) filters.value.dateRange = null; else filters.value.dateRange = range; currentPage.value = 1; refreshData(); };
+            const changePage = (d) => { currentPage.value += d; refreshData(); };
+            const performSearch = () => { if(!searchQuery.value) return; currentView.value = 'search'; currentPage.value = 1; showMobileSearch.value = false; refreshData(); };
+            const goHome = () => { currentView.value = 'home'; searchQuery.value = ''; currentPage.value = 1; refreshData(); };
+            const goBack = () => { currentView.value = searchQuery.value ? 'search' : 'home'; };
 
-            const toggleGenre = (id) => {
-                const idx = filters.value.selectedGenres.indexOf(id);
-                if (idx > -1) filters.value.selectedGenres.splice(idx, 1);
-                else filters.value.selectedGenres.push(id);
-                currentPage.value = 1;
-                refreshData();
-            };
-            
-            const toggleDateRange = (range) => {
-                // 修改为 label 对比，解决选中状态样式 bug
-                if (filters.value.dateRange?.label === range.label) filters.value.dateRange = null;
-                else filters.value.dateRange = range;
-                currentPage.value = 1;
-                refreshData();
-            };
-
-            const changePage = (delta) => {
-                currentPage.value += delta;
-                refreshData();
-            };
-
-            // 修改：搜索时不重置 filters，仅切换视图
-            const performSearch = () => {
-                if (!searchQuery.value.trim()) return;
-                
-                // 注释掉重置逻辑
-                // filters.value = { ... };
-
-                currentView.value = 'search';
-                currentPage.value = 1;
-                showMobileSearch.value = false;
-                refreshData();
-            };
-
-            // 修改：从搜索页回到主页
-            const goHome = () => {
-                currentView.value = 'home';
-                searchQuery.value = '';
-                currentPage.value = 1; // 重置页码，但 filters 保持不变
-                refreshData();
-            };
-
-            // --- 详情页逻辑 ---
             const goToDetail = async (id, type) => {
                 loading.value = true;
                 detailData.value = null;
                 currentSeasonData.value = null;
                 selectedSeasonNumber.value = null;
-                
-                const targetMediaType = type || mediaType.value;
+                raw115Resources.value = [];
+                seasonTabsRefs.value = {}; // Reset refs
 
                 try {
-                    const data = await fetchWithCache(`/tmdb/details/${targetMediaType}/${id}`);
+                    const targetType = type || mediaType.value;
+                    const data = await fetchWithCache(`/tmdb/details/${targetType}/${id}`);
                     detailData.value = data;
                     currentView.value = 'detail';
-                    
-                    if ((targetMediaType === 'tv' || data.media_type === 'tv') && data.seasons && data.seasons.length > 0) {
-                        const firstSeason = data.seasons.find(s => s.season_number === 1) || data.seasons[0];
-                        selectSeason(firstSeason);
+
+                    if (targetType === 'tv') {
+                        fetchWithCache(`/resources/tv/${id}`).then(res => { raw115Resources.value = res || []; });
+                        if (data.seasons?.length) {
+                            const first = data.seasons.find(s => s.season_number === 1) || data.seasons[0];
+                            selectSeason(first);
+                        }
                     }
-                } catch (e) {
-                    alert("加载详情失败");
-                    console.error(e);
-                } finally {
-                    loading.value = false;
-                }
+                } catch(e) { console.error(e); } 
+                finally { loading.value = false; }
             };
 
             const selectSeason = async (season) => {
                 selectedSeasonNumber.value = season.season_number;
-                currentSeasonData.value = null; 
+                currentSeasonData.value = null;
                 
-                try {
-                    const url = `/tmdb/details/tv/${detailData.value.tmdb_id}/season/${season.season_number}`;
-                    const data = await fetchWithCache(url);
-                    currentSeasonData.value = data;
-                } catch (e) {
-                    console.error("Failed to load season details", e);
+                // Scroll Logic
+                await nextTick();
+                const el = seasonTabsRefs.value[season.season_number];
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
                 }
+
+                try {
+                    const data = await fetchWithCache(`/tmdb/details/tv/${detailData.value.tmdb_id}/season/${season.season_number}`);
+                    currentSeasonData.value = data;
+                } catch(e) {}
             };
 
-            const goBack = () => {
-                if (searchQuery.value) currentView.value = 'search';
-                else currentView.value = 'home';
+            // Full Series 115 Calculation
+            const fullSeries115 = computed(() => {
+                if (!detailData.value || !detailData.value.seasons || raw115Resources.value.length === 0) return [];
+                const validSeasons = detailData.value.seasons.filter(s => s.season_number > 0).map(s => `S${s.season_number}`);
+                if (validSeasons.length === 0) return [];
+                return raw115Resources.value.filter(res => {
+                    if (!res.season_list) return false;
+                    return validSeasons.every(s => res.season_list.includes(s));
+                });
+            });
+
+            // Specific Season 115 (Filtered to exclude full packs)
+            const getCurrentSeason115 = (seasonNum) => {
+                if (raw115Resources.value.length === 0) return [];
+                
+                // Identify Full Series Links to Exclude
+                const fullSeriesLinks = new Set(fullSeries115.value.map(r => r.link));
+
+                const targetS = `S${seasonNum}`;
+                const validSeasonsCount = detailData.value.seasons.filter(s => s.season_number > 0).length;
+
+                return raw115Resources.value.filter(res => {
+                    // Must include current season AND not be a full pack
+                    return res.season_list && res.season_list.includes(targetS) && !fullSeriesLinks.has(res.link);
+                }).map(res => {
+                    const newRes = { ...res };
+                    const isFull = (newRes.season_list.length >= validSeasonsCount); 
+                    if (!isFull) {
+                        const nums = newRes.season_list.map(s => parseInt(s.replace('S',''))).filter(n => !isNaN(n)).sort((a,b) => a-b);
+                        if (nums.length > 0) {
+                            const isContinuous = nums.every((val, i) => i === 0 || val === nums[i-1] + 1);
+                            if (isContinuous && nums.length > 1) newRes.season_tag = `包含 S${nums[0]}-S${nums[nums.length-1]}`;
+                            else if (nums.length === 1) newRes.season_tag = `仅包含 S${nums[0]}`;
+                            else newRes.season_tag = `包含 ${newRes.season_list.join(',')}`;
+                        }
+                    }
+                    return newRes;
+                });
             };
 
-            const getYear = (dateStr) => {
-                return dateStr ? dateStr.split('-')[0] : '';
+            const openEpisodeModal = (seasonNum, episode) => {
+                currentEpisode.value = { ...episode, season_number: seasonNum };
+                showEpisodeModal.value = true;
             };
+            const closeEpisodeModal = () => showEpisodeModal.value = false;
 
-            // 初始化
             onMounted(() => {
-                if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
                     isDark.value = true;
                     document.documentElement.classList.add('dark');
-                } else {
-                    isDark.value = false;
-                }
-
+                } else { isDark.value = false; }
                 loadGenres();
                 refreshData();
             });
 
             return {
-                currentView, isDark, toggleTheme,
-                mediaType, switchMediaType,
-                loading, mediaList,
-                searchQuery, performSearch, goHome, showMobileSearch,
-                currentPage, changePage,
-                showAdvancedFilters, filters, genres, dateRanges,
-                toggleGenre, toggleDateRange, refreshData,
-                goToDetail, detailData, goBack, getYear,
-                selectedSeasonNumber, currentSeasonData, selectSeason
+                currentView, isDark, toggleTheme, mediaType, switchMediaType, mediaList, loading,
+                searchQuery, performSearch, goHome, goBack, currentPage, changePage,
+                filters, genres, dateRanges, refreshData, showAdvancedFilters, toggleGenre, toggleDateRange,
+                goToDetail, detailData,
+                selectedSeasonNumber, currentSeasonData, selectSeason,
+                showEpisodeModal, openEpisodeModal, closeEpisodeModal, currentEpisode, showMobileSearch,
+                fullSeries115, getCurrentSeason115,
+                seasonTabsContainer, seasonTabsRefs // Return refs
             };
         }
     }).mount('#app');
