@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Query, Path, HTTPException
 from typing import Optional, List
 from app.services.tmdb import tmdb_service
+from app.services.nullbr import nullbr_service
 from app.models.schemas import SearchResult, MediaDetail, Season, Genre
 
 router = APIRouter(prefix="/tmdb", tags=["Metadata"])
@@ -8,10 +9,6 @@ router = APIRouter(prefix="/tmdb", tags=["Metadata"])
 # --- 辅助接口 ---
 @router.get("/genres/{media_type}", response_model=List[Genre])
 async def get_genre_list(media_type: str = Path(..., pattern="^(movie|tv)$")):
-    """
-    获取类型 ID 对照表 (供筛选使用)
-    例如: 动作=28, 剧情=18
-    """
     raw_list = tmdb_service.get_genres(media_type)
     return [Genre(id=g['id'], name=g['name']) for g in raw_list]
 
@@ -48,13 +45,7 @@ async def discover_media(
 
 # --- 搜索 Search ---
 @router.get("/search", response_model=SearchResult)
-async def search_media(
-    query: str, 
-    page: int = 1,
-):
-    """
-    搜索影视剧，支持评分区间筛选
-    """
+async def search_media(query: str, page: int = 1):
     if not query:
         raise HTTPException(status_code=400, detail="Query cannot be empty")
     return tmdb_service.search_media(query, page)
@@ -65,21 +56,25 @@ async def get_media_details(
     media_type: str = Path(..., pattern="^(movie|tv)$"),
     tmdb_id: int = Path(...)
 ):
-    """
-    获取超级详细信息：包含导演、演员、类型、推荐、相似
-    如果是电视剧，会列出所有季的基础信息
-    """
     try:
-        return tmdb_service.get_details_full(media_type, tmdb_id)
+        # 1. Get TMDB Details
+        details = tmdb_service.get_details_full(media_type, tmdb_id)
+        
+        # 2. Check Availability via Nullbr SDK
+        if media_type == 'movie':
+            avail = nullbr_service.get_movie_availability(tmdb_id)
+        else:
+            avail = nullbr_service.get_tv_availability(tmdb_id)
+        
+        details.availability = avail
+        return details
+        
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Media not found or TMDB error: {str(e)}")
+        raise HTTPException(status_code=404, detail=f"Media not found or error: {str(e)}")
 
 # --- 剧集特有 TV Specific ---
 @router.get("/details/tv/{tmdb_id}/season/{season_number}", response_model=Season)
 async def get_season_details(tmdb_id: int, season_number: int):
-    """
-    获取某季的具体分集信息
-    """
     try:
         return tmdb_service.get_season_details(tmdb_id, season_number)
     except Exception as e:

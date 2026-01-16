@@ -13,6 +13,13 @@ class Person(BaseModel):
     job: Optional[str] = None       # 职位 (导演/编剧用)
     profile_path: Optional[str] = None
 
+# --- 资源可用性 (New) ---
+class ResourceAvailability(BaseModel):
+    has_115: bool = False
+    has_magnet: bool = False
+    has_ed2k: bool = False
+    has_video: bool = False
+
 # --- 基础媒体信息 (列表页用) ---
 class MediaMeta(BaseModel):
     tmdb_id: int
@@ -58,7 +65,9 @@ class MediaDetail(MediaMeta):
     recommendations: List[MediaMeta] = []
     similar: List[MediaMeta] = []
     # 电视剧特有
-    seasons: List[Season] = [] 
+    seasons: List[Season] = []
+    # 资源可用性
+    availability: Optional[ResourceAvailability] = None
 
 class SearchResult(BaseModel):
     total_results: int
@@ -118,11 +127,11 @@ class P115ShareSaveRequest(BaseModel):
     share_link: str = Field(..., description="115分享链接")
     file_ids: List[str] = Field(..., description="要转存的文件/目录ID列表")
     password: Optional[str] = Field(None, description="提取码/密码")
-    to_cid: Optional[str] = Field(None, description="目标目录ID，如果不填则使用配置的 P115_SAVE_PATH") # 新增字段
+    to_cid: Optional[str] = Field(None, description="目标目录ID，如果不填则使用配置的 P115_SAVE_PATH") 
 
 class P115OfflineAddRequest(BaseModel):
     urls: List[str] = Field(..., description="下载链接列表 (http/ftp/magnet/ed2k)")
-    to_cid: Optional[str] = Field(None, description="目标目录ID，如果不填则使用配置的 P115_DOWNLOAD_PATH") # 顺便也给离线下载加上
+    to_cid: Optional[str] = Field(None, description="目标目录ID，如果不填则使用配置的 P115_DOWNLOAD_PATH")
 
 class P115Response(BaseModel):
     state: bool
