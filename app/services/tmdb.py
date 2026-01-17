@@ -180,7 +180,8 @@ class TMDBService:
 
     def discover_media(self, media_type: str, page: int = 1, sort_by: str = "popularity.desc",
                        with_genres: Optional[str] = None, start_date: Optional[str] = None,
-                       end_date: Optional[str] = None, min_vote: float = 0, min_vote_count: int = 0) -> SearchResult:
+                       end_date: Optional[str] = None, min_vote: float = 0, min_vote_count: int = 0,
+                       with_original_language: Optional[str] = None) -> SearchResult:
         params = {
             'page': page, 
             'sort_by': sort_by, 
@@ -189,6 +190,7 @@ class TMDBService:
             'language': settings.TMDB_LANGUAGE
         }
         if with_genres: params['with_genres'] = with_genres
+        if with_original_language: params['with_original_language'] = with_original_language
 
         if media_type == 'movie':
             if start_date: params['primary_release_date.gte'] = start_date

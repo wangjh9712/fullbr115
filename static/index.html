@@ -266,6 +266,21 @@
                         </div>
 
                         <div>
+                            <span class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">地区/语言</span>
+                            <div class="flex flex-wrap gap-2">
+                                <button v-for="lang in languageOptions" :key="lang.code"
+                                    @click="toggleLanguage(lang.code)"
+                                    class="px-3 py-1 rounded-full text-xs transition border"
+                                    :class="filters.originalLanguage === lang.code ? 'bg-emby-accent text-white border-emby-accent' : 'bg-transparent border-gray-300 dark:border-gray-600 hover:border-emby-accent'">
+                                    {{ lang.label }}
+                                </button>
+                                <button @click="filters.originalLanguage = null; refreshData()" class="px-3 py-1 text-xs text-gray-500 hover:text-emby-accent">
+                                    清除
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
                             <span class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">类型</span>
                             <div class="flex flex-wrap gap-2 max-h-32 overflow-y-auto custom-scrollbar">
                                 <button v-for="g in genres" :key="g.id"
@@ -901,7 +916,7 @@
             const seasonTabsRefs = ref({});
 
             const showAdvancedFilters = ref(false);
-            const filters = ref({ sortBy: 'popularity.desc', minVote: 0, minVoteCount: 100, selectedGenres: [], dateRange: null });
+            const filters = ref({ sortBy: 'popularity.desc', minVote: 0, minVoteCount: 100, selectedGenres: [], dateRange: null, originalLanguage: null });
             const showEpisodeModal = ref(false);
             const currentEpisode = ref({});
 
@@ -922,6 +937,26 @@
                 }
                 return ranges.reverse();
             });
+
+            const languageOptions = [
+                { label: '华语', code: 'zh' },
+                { label: '英语', code: 'en' },
+                { label: '日本', code: 'ja' },
+                { label: '韩国', code: 'ko' },
+                { label: '法国', code: 'fr' },
+                { label: '德国', code: 'de' },
+                { label: '西班牙', code: 'es' },
+                { label: '泰国', code: 'th' },
+                { label: '印度', code: 'hi' },
+                { label: '俄罗斯', code: 'ru' }
+            ];
+
+            const toggleLanguage = (code) => {
+                if (filters.value.originalLanguage === code) filters.value.originalLanguage = null;
+                else filters.value.originalLanguage = code;
+                currentPage.value = 1;
+                refreshData();
+            };
 
             const showToast = ({ message, type = 'success', duration = 3000 }) => {
                 const id = toastIdCounter++;
@@ -952,6 +987,7 @@
                     params.append('min_vote', filters.value.minVote);
                     params.append('min_vote_count', filters.value.minVoteCount);
                     if (filters.value.selectedGenres.length) params.append('with_genres', filters.value.selectedGenres.join(','));
+                    if (filters.value.originalLanguage) params.append('with_original_language', filters.value.originalLanguage);
                     if (filters.value.dateRange) { params.append('start_date', filters.value.dateRange.start); params.append('end_date', filters.value.dateRange.end); }
                 } else if (currentView.value === 'search') { params.append('query', searchQuery.value); }
                 return `${base}?${params.toString()}`;
@@ -1070,7 +1106,7 @@
             return {
                 currentView, isDark, toggleTheme, mediaType, switchMediaType, mediaList, loading,
                 searchQuery, performSearch, goHome, goBack, currentPage, changePage,
-                filters, genres, dateRanges, refreshData, showAdvancedFilters, toggleGenre, toggleDateRange,
+                filters, genres, dateRanges, refreshData, showAdvancedFilters, toggleGenre, toggleDateRange, languageOptions, toggleLanguage,
                 goToDetail, detailData,
                 selectedSeasonNumber, currentSeasonData, selectSeason,
                 showEpisodeModal, openEpisodeModal, closeEpisodeModal, currentEpisode, showMobileSearch,

@@ -22,7 +22,8 @@ async def discover_media(
     start_date: Optional[str] = Query(None, description="开始日期 (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="结束日期 (YYYY-MM-DD)"),
     min_vote: float = Query(0, description="最低评分 (0-10)"),
-    min_vote_count: int = Query(0, description="最少评分人数 (建议设置>50以过滤冷门片)")
+    min_vote_count: int = Query(0, description="最少评分人数 (建议设置>50以过滤冷门片)"),
+    with_original_language: Optional[str] = Query(None, description="原始语言 (ISO 639-1), e.g. zh, en, ja")
 ):
     """
     探索发现影视资源 (核心功能)
@@ -40,7 +41,8 @@ async def discover_media(
         start_date=start_date,
         end_date=end_date,
         min_vote=min_vote,
-        min_vote_count=min_vote_count
+        min_vote_count=min_vote_count,
+        with_original_language=with_original_language
     )
 
 # --- 搜索 Search ---
