@@ -1,0 +1,12 @@
+services:
+  fullbr115:
+    build: .
+    container_name: fullbr115
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    # 加载环境变量文件
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Shanghai
