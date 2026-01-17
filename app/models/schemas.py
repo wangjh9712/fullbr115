@@ -94,11 +94,11 @@ class MediaResource(BaseModel):
     # --- 115特有 ---
     season_list: Optional[List[str]] = None # 仅 115 分享链接可能有此字段
 
-    @field_validator('quality', mode='before')
-    def parse_quality(cls, v):
-        """处理 quality 字段可能是列表的情况"""
+    @field_validator('quality', 'source', mode='before')
+    def parse_list_fields(cls, v):
+        """处理 quality, source 字段可能是列表的情况"""
         if isinstance(v, list):
-            return ", ".join(v)
+            return ", ".join([str(i) for i in v])
         return v
 
     @field_validator('has_chinese_subtitle', mode='before')
