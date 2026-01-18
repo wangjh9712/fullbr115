@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, field_validator
-from typing import Optional, List, Any
+from typing import Optional, List, Dict, Any
 
 # --- 基础组件 ---
 class Genre(BaseModel):
@@ -151,3 +151,37 @@ class P115File(BaseModel):
     is_dir: bool = Field(False, description="是否为目录")
     pick_code: str = Field(..., description="提取码")
     time: str = Field(..., description="修改时间")
+
+# --- 订阅相关 ---
+class SubscriptionRequest(BaseModel):
+    tmdb_id: int
+    media_type: str = Field(..., pattern="^(movie|tv)$")
+    title: str
+    season_number: int = 1         # 剧集必填
+    start_episode: int = 1         # 剧集必填，用户选择从第几集开始
+    poster_path: Optional[str] = None
+
+class Subscription(BaseModel):
+    id: str                        # 唯一标识
+    tmdb_id: int
+    media_type: str
+    title: str
+    poster_path: Optional[str] = None
+    
+    # 状态
+    status: str = "active"         # active, completed, paused
+    last_check_time: str = ""      # 上次检查时间
+    next_check_time: str = ""      # 下次允许检查的时间
+    message: str = ""              # 状态描述
+    
+    # 存储配置
+    save_cid: Optional[str] = None # [新增] 专属文件夹CID (剧集用)
+
+    # 电影特有
+    release_date: Optional[str] = None 
+    
+    # 剧集特有
+    season_number: int = 1
+    current_episode: int = 0       
+    total_episodes: int = 0        
+    episode_air_dates: Dict[str, str] = {} # {"1": "2025-01-01"}

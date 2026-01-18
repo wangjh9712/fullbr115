@@ -193,6 +193,9 @@
                     <button class="md:hidden p-2" @click="showMobileSearch = !showMobileSearch">
                         <i class="fa-solid fa-search"></i>
                     </button>
+                    <button @click="currentView = 'subscriptions'; refreshSubscriptions()" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition" title="我的订阅">
+                        <i class="fa-solid fa-bell text-emby-gold"></i>
+                    </button>
                     <button @click="toggleTheme" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition">
                         <i class="fa-solid" :class="isDark ? 'fa-sun text-yellow-400' : 'fa-moon text-gray-600'"></i>
                     </button>
@@ -209,6 +212,51 @@
 
     <main class="flex-grow">
         
+        <div v-if="currentView === 'subscriptions'" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <i class="fa-solid fa-bell text-yellow-500 mr-3"></i>我的订阅
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div v-for="sub in subscriptionList" :key="sub.id" 
+                     class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow flex space-x-4 relative overflow-hidden group border border-gray-200 dark:border-gray-700">
+                    
+                    <div class="w-20 h-28 flex-shrink-0 bg-gray-200">
+                        <img :src="sub.poster_path" class="w-full h-full object-cover rounded shadow-sm">
+                    </div>
+                    
+                    <div class="flex-1 min-w-0 flex flex-col justify-center">
+                        <h3 class="font-bold truncate text-gray-900 dark:text-gray-100">{{ sub.title }}</h3>
+                        <p class="text-xs text-gray-500 mt-1">
+                            {{ sub.media_type === 'movie' ? '电影' : `S${sub.season_number} / 已更至 ${sub.current_episode}集` }}
+                        </p>
+                        
+                        <div class="mt-2">
+                            <span class="inline-block px-2 py-0.5 rounded text-[10px] font-medium" 
+                                :class="sub.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'">
+                                {{ sub.status === 'completed' ? '已完结' : '追更中' }}
+                            </span>
+                        </div>
+                        
+                        <p class="text-xs text-gray-400 mt-2 truncate" :title="sub.message">
+                            <i class="fa-solid fa-clock-rotate-left mr-1"></i> {{ sub.message }}
+                        </p>
+                    </div>
+
+                    <button @click="deleteSubscription(sub.id)" 
+                            class="absolute top-2 right-2 p-2 text-gray-400 hover:text-red-500 transition opacity-0 group-hover:opacity-100"
+                            title="取消订阅">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div v-if="subscriptionList.length === 0" class="text-center py-20 text-gray-500">
+                <i class="fa-solid fa-bell-slash text-4xl mb-4 opacity-30"></i>
+                <p>暂无订阅，去发现页添加吧</p>
+            </div>
+        </div>
+
         <div v-if="currentView === 'home' || currentView === 'search'" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             
             <div v-if="currentView === 'home'" class="mb-8 space-y-4">
@@ -364,9 +412,16 @@
                     </div>
 
                     <div class="flex-1 text-center md:text-left space-y-4">
-                        <h1 class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">{{ detailData.title }}</h1>
+                        <h1 class="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">{{ detailData.title }}
+                            <button @click.stop="toggleSubscribe" 
+                                    class="focus:outline-none transition-transform hover:scale-110 active:scale-95" 
+                                    :title="isSubscribed ? '取消订阅' : '订阅追更'">
+                                <i class="text-2xl" 
+                                :class="isSubscribed ? 'fa-solid fa-bell text-yellow-500' : 'fa-regular fa-bell text-gray-400 dark:text-gray-500 hover:text-yellow-500'">
+                                </i>
+                            </button>
+                        </h1>
                         <p class="text-lg text-gray-500 font-serif italic">{{ detailData.original_title }}</p>
-                        
                         <div class="flex flex-wrap items-center justify-center md:justify-start gap-3 text-sm">
                             <span class="bg-emby-accent text-white px-2 py-0.5 rounded font-bold">TMDB {{ detailData.vote_average.toFixed(1) }}</span>
                             <span class="text-gray-600 dark:text-gray-300">{{ detailData.release_date }}</span>
@@ -514,6 +569,50 @@
                             @notify="showToast"
                         ></resource-panel>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-if="showSubscribeModal" class="fixed inset-0 z-[110] flex items-center justify-center p-4">
+            <div class="absolute inset-0 bg-black/80 backdrop-blur-sm" @click="showSubscribeModal = false"></div>
+            <div class="relative bg-white dark:bg-gray-800 w-full max-w-md rounded-xl shadow-2xl p-6 animate-slide-up">
+                <h3 class="text-xl font-bold mb-4 text-gray-900 dark:text-white">订阅设置</h3>
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-medium mb-1 text-gray-500">资源名称</label>
+                    <div class="text-gray-900 dark:text-gray-100 font-medium">{{ detailData.title }}</div>
+                </div>
+
+                <div v-if="detailData.media_type === 'tv'" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-gray-500">选择季度</label>
+                        <select v-model="subForm.season_number" class="w-full bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded p-2 border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-yellow-500 outline-none">
+                            <option v-for="s in detailData.seasons.filter(x=>x.season_number>0)" :key="s.id" :value="s.season_number">
+                                {{ s.name }} (共{{ s.episode_count }}集)
+                            </option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium mb-1 text-gray-500">起始集数 (当前看到第几集?)</label>
+                        <input type="number" v-model.number="subForm.start_episode" min="1" 
+                            class="w-full bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded p-2 border border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-yellow-500 outline-none">
+                        <p class="text-xs text-gray-500 mt-1">
+                            例如：如果你想从第 1 集开始下载，填 1。<br>
+                            如果你已经看完了第 5 集，想从第 6 集开始下，填 6。
+                        </p>
+                    </div>
+                </div>
+                
+                <div v-else class="text-sm text-gray-500 mb-6">
+                    电影订阅将持续监控，直到资源可用并自动下载。
+                </div>
+
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button @click="showSubscribeModal = false" class="px-4 py-2 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">取消</button>
+                    <button @click="submitSubscription" class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 transition shadow-lg">
+                        确认订阅
+                    </button>
                 </div>
             </div>
         </div>
@@ -920,6 +1019,10 @@
             const showEpisodeModal = ref(false);
             const currentEpisode = ref({});
 
+            const subscriptionList = ref([]);
+            const showSubscribeModal = ref(false);
+            const subForm = ref({ season_number: 1, start_episode: 1 });
+
             // Toasts State
             const toasts = ref([]);
             let toastIdCounter = 0;
@@ -952,8 +1055,24 @@
             ];
 
             const toggleLanguage = (code) => {
-                if (filters.value.originalLanguage === code) filters.value.originalLanguage = null;
-                else filters.value.originalLanguage = code;
+                if (filters.value.originalLanguage === code) {
+
+                    filters.value.originalLanguage = null;
+                    // 默认情况视为包含英语，恢复默认阈值 (e.g. 100)
+                    filters.value.minVoteCount = 100;
+                } else {
+                    // 选中新语言
+                    filters.value.originalLanguage = code;
+                    
+                    // 动态调整评分人数限制
+                    if (code === 'en') {
+                        // 英语内容投票人数较多，保持默认阈值
+                        filters.value.minVoteCount = 100;
+                    } else {
+                        // 其他语言（如日韩德法）在 TMDB 上投票较少
+                        filters.value.minVoteCount = 0;
+                    }
+                }
                 currentPage.value = 1;
                 refreshData();
             };
@@ -993,6 +1112,121 @@
                 return `${base}?${params.toString()}`;
             };
 
+            const isSubscribed = computed(() => {
+                if (!detailData.value || !subscriptionList.value) return false;
+                // 检查订阅列表中是否有匹配 tmdb_id 和 media_type 的项目
+                return subscriptionList.value.some(s => 
+                    s.tmdb_id === detailData.value.tmdb_id && 
+                    s.media_type === detailData.value.media_type
+                );
+            });
+
+            const toggleSubscribe = async () => {
+                if (isSubscribed.value) {
+                    // 已订阅 -> 执行取消逻辑
+                    const subs = subscriptionList.value.filter(s => 
+                        s.tmdb_id === detailData.value.tmdb_id && 
+                        s.media_type === detailData.value.media_type
+                    );
+                    
+                    // 如果是剧集，可能存在多个季度的订阅，提示会稍微不同
+                    const confirmMsg = subs.length > 1 
+                        ? '确定要取消该剧集的所有订阅吗？' 
+                        : '确定要取消订阅吗？';
+
+                    if(confirm(confirmMsg)) {
+                        try {
+                            // 逐个删除（通常只有一个）
+                            for (const sub of subs) {
+                                await fetch(`/subscribe/${sub.id}`, { method: 'DELETE' });
+                            }
+                            showToast({ message: '已取消订阅', type: 'success' });
+                            await refreshSubscriptions(); // 刷新列表以更新 UI 状态
+                        } catch(e) {
+                            showToast({ message: '取消失败', type: 'error' });
+                        }
+                    }
+                } else {
+                    // 未订阅 -> 打开设置弹窗
+                    openSubscribeModal();
+                }
+            };
+
+            const refreshSubscriptions = async () => {
+                try {
+                    const res = await fetch('/subscribe/list');
+                    if (res.ok) {
+                        subscriptionList.value = await res.json();
+                    }
+                } catch(e) {
+                    console.error("Failed to load subscriptions", e);
+                }
+            };
+
+            const openSubscribeModal = () => {
+            // 重置表单
+                subForm.value = { 
+                    season_number: 1, 
+                    start_episode: 1 
+                };
+                
+                // 如果是剧集，尝试自动选中当前浏览的季度
+                if (detailData.value.media_type === 'tv') {
+                    if (selectedSeasonNumber.value) {
+                        subForm.value.season_number = selectedSeasonNumber.value;
+                    } else if (detailData.value.seasons && detailData.value.seasons.length > 0) {
+                        // 默认选第一季
+                        const first = detailData.value.seasons.find(s => s.season_number > 0) || detailData.value.seasons[0];
+                        if (first) subForm.value.season_number = first.season_number;
+                    }
+                }
+                showSubscribeModal.value = true;
+            };
+
+            const submitSubscription = async () => {
+                try {
+                    showToast({ message: '正在提交订阅...', type: 'success' });
+                    
+                    const payload = {
+                        tmdb_id: detailData.value.tmdb_id,
+                        media_type: detailData.value.media_type,
+                        title: detailData.value.title,
+                        poster_path: detailData.value.poster_path,
+                        season_number: subForm.value.season_number,
+                        start_episode: subForm.value.start_episode
+                    };
+
+                    const res = await fetch('/subscribe/add', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(payload)
+                    });
+                    const json = await res.json();
+                    
+                    if (res.ok) {
+                        showToast({ message: json.message, type: 'success' });
+                        showSubscribeModal.value = false;
+                    } else {
+                        showToast({ message: '订阅失败: ' + json.detail, type: 'error' });
+                    }
+                } catch(e) {
+                    showToast({ message: '请求错误: ' + e.message, type: 'error' });
+                }
+            };
+
+            const deleteSubscription = async (id) => {
+                if(!confirm('确定要取消订阅吗？')) return;
+                try {
+                    const res = await fetch(`/subscribe/${id}`, { method: 'DELETE' });
+                    if (res.ok) {
+                        showToast({ message: '已取消订阅', type: 'success' });
+                        refreshSubscriptions();
+                    }
+                } catch(e) {
+                    showToast({ message: '操作失败', type: 'error' });
+                }
+            };
+
             const refreshData = async () => {
                 loading.value = true;
                 mediaList.value = [];
@@ -1004,7 +1238,22 @@
                 } finally { loading.value = false; }
             };
 
-            const switchMediaType = (type) => { mediaType.value = type; currentPage.value = 1; filters.value.selectedGenres = []; loadGenres(); refreshData(); };
+            const switchMediaType = (type) => { 
+                mediaType.value = type; 
+                currentPage.value = 1; 
+                filters.value.selectedGenres = []; 
+                
+                if (type === 'movie') {
+                    // 电影默认为“最热门”
+                    filters.value.sortBy = 'popularity.desc';
+                } else {
+                    // 剧集默认为“最新上映”
+                    filters.value.sortBy = 'primary_release_date.desc';
+                }
+                
+                loadGenres(); 
+                refreshData(); 
+            };
             const toggleGenre = (id) => { const idx = filters.value.selectedGenres.indexOf(id); if (idx > -1) filters.value.selectedGenres.splice(idx, 1); else filters.value.selectedGenres.push(id); currentPage.value = 1; refreshData(); };
             const toggleDateRange = (range) => { if (filters.value.dateRange?.label === range.label) filters.value.dateRange = null; else filters.value.dateRange = range; currentPage.value = 1; refreshData(); };
             const changePage = (d) => { currentPage.value += d; refreshData(); };
@@ -1019,6 +1268,7 @@
                 selectedSeasonNumber.value = null;
                 raw115Resources.value = [];
                 seasonTabsRefs.value = {}; 
+                refreshSubscriptions();
 
                 try {
                     const targetType = type || mediaType.value;
@@ -1110,6 +1360,8 @@
                 goToDetail, detailData,
                 selectedSeasonNumber, currentSeasonData, selectSeason,
                 showEpisodeModal, openEpisodeModal, closeEpisodeModal, currentEpisode, showMobileSearch,
+                subscriptionList, refreshSubscriptions, isSubscribed, toggleSubscribe,
+                showSubscribeModal, openSubscribeModal, subForm, submitSubscription, deleteSubscription,
                 fullSeries115, getCurrentSeason115,
                 seasonTabsContainer, seasonTabsRefs,
                 toasts, showToast, removeToast
