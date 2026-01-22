@@ -210,8 +210,9 @@ class SubscriptionService:
         if valid_res:
             valid_res.sort(key=lambda x: self._parse_size(x.size), reverse=True)
             target = valid_res[0]
-            success = await self._perform_download(target, to_cid=sub.save_cid)
-            
+            movie_path = settings.P115_DOWNLOAD_PATH
+            success = await self._perform_download(target, to_cid=sub.save_cid, save_path_str=movie_path)
+
             if success:
                 sub.status = 'completed'
                 sub.message = f"已获取资源: {target.title} ({target.size})"
@@ -224,6 +225,12 @@ class SubscriptionService:
         # [修改] 使用循环，一次性追完所有可用集数
         max_loops = 50 # 防止死循环的安全阈值
         loops = 0
+
+        # 逻辑必须与 add_subscription 中的 target_path 逻辑一致
+        base_path = settings.P115_DOWNLOAD_PATH or ""
+        # 剧集路径通常为: 基础下载路径/剧集标题
+        # 注意：这里我们通知 MoviePilot 扫描整个剧集文件夹，这样它能处理新增加的集数
+        tv_show_path = f"{base_path}/{sub.title}".replace("//", "/")
 
         while loops < max_loops:
             loops += 1
@@ -257,7 +264,7 @@ class SubscriptionService:
                 valid_res.sort(key=lambda x: self._parse_size(x.size), reverse=True)
                 target = valid_res[0]
 
-                success = await self._perform_download(target, to_cid=sub.save_cid)
+                success = await self._perform_download(target, to_cid=sub.save_cid, save_path_str=tv_show_path)
                 
                 if success:
                     # [关键修改] 解析文件名，检测是否为打包资源
@@ -289,12 +296,13 @@ class SubscriptionService:
         sub.message = msg
         sub.next_check_time = (datetime.now() + timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
 
-    async def _perform_download(self, resource, to_cid: Optional[str] = None) -> bool:
+    async def _perform_download(self, resource, to_cid: Optional[str] = None, save_path_str: Optional[str] = None) -> bool:
+        """执行离线下载"""
         try:
             if resource.link_type not in ['magnet', 'ed2k']:
                 return False
             res = await asyncio.to_thread(
-                p115_service.add_offline_tasks, [resource.link], to_cid=to_cid
+                p115_service.add_offline_tasks, [resource.link], to_cid=to_cid, save_path_str=save_path_str
             )
             return res.get('success', False)
         except Exception as e:

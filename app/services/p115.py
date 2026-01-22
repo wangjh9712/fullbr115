@@ -5,6 +5,7 @@ from pathlib import Path
 from p115client import P115Client
 from p115client.util import share_extract_payload
 from app.core.config import settings
+from app.services.strm import strm_service
 
 class P115Service:
     def __init__(self):
@@ -161,21 +162,16 @@ class P115Service:
             "share_info": data.get("share_info")
         }
 
-    def save_share_files(self, share_link: str, file_ids: List[str], password: Optional[str] = None, to_cid: Optional[str] = None) -> Dict[str, Any]:
+    def save_share_files(self, share_link: str, file_ids: List[str], password: Optional[str] = None, to_cid: Optional[str] = None, save_path_str: Optional[str] = None) -> Dict[str, Any]:
         """
-        转存分享链接中的文件。参考 ShareTransferHelper.add_share_115
+        转存文件。
+        :param save_path_str: 明确的目标路径字符串（用于 STRM 生成通知）。如果未提供且 to_cid 为空，则使用默认配置路径。
         """
-        # 1. 获取目标 CID
         save_cid = self.get_target_cid(settings.P115_SAVE_PATH, to_cid)
-
-        # 2. 解析分享信息
         payload_info = share_extract_payload(share_link)
         share_code = payload_info["share_code"]
         receive_code = password if password else payload_info.get("receive_code", "")
 
-        # 3. 构造请求参数
-        # 如果 file_ids 为空或者包含 "0"，通常意味着转存全部 (视业务逻辑而定，这里假设必须传入 file_ids)
-        # 115 接口: file_id 为逗号分隔的字符串
         file_id_str = ",".join(file_ids) if file_ids else "0" 
 
         payload = {
@@ -183,48 +179,57 @@ class P115Service:
             "receive_code": receive_code,
             "file_id": file_id_str,
             "cid": save_cid,
-            "is_check": 0, # 参考 reference 设为 0
+            "is_check": 0,
         }
 
-        # 4. 执行转存
         resp = self.client.share_receive(payload)
-
+        
         if not resp.get("state"):
             return {"success": False, "message": resp.get("error"), "raw": resp}
         
+        try:
+            # 确定通知的路径：优先使用传入的路径，否则使用默认配置路径
+            notify_path = save_path_str if save_path_str else settings.P115_SAVE_PATH
+            if notify_path:
+                strm_service.notify_gen_by_path(notify_path)
+        except Exception as e:
+            print(f"Failed to trigger STRM gen: {e}")
+
         return {"success": True, "message": "Saved successfully", "raw": resp}
 
-    def add_offline_tasks(self, urls: List[str], to_cid: Optional[str] = None) -> Dict[str, Any]:
+    def add_offline_tasks(self, urls: List[str], to_cid: Optional[str] = None, save_path_str: Optional[str] = None) -> Dict[str, Any]:
         """
-        添加离线下载任务。参考 OfflineDownloadHelper.build_offline_urls_payload
+        离线下载。
+        :param save_path_str: 明确的目标路径字符串（用于 STRM 生成通知）。
         """
         if not urls:
             return {"success": False, "message": "No URLs provided"}
 
-        # 1. 获取目标 CID
-        # 离线下载使用的是 wp_path_id
         save_cid = self.get_target_cid(settings.P115_DOWNLOAD_PATH, to_cid)
 
-        # 2. 构造参数
-        # 参考 reference: payload[f"url[{i}]"] = url.strip()
-        # p115client.tool.offline.offline_add_urls 实际上封装了这个过程，
-        # 如果直接用 client.offline_add_urls (底层 API 调用)，需要自己构造
-        # 但 p115client 库通常提供了便捷方法。这里我们按照 reference 的逻辑手动构建 payload 传给 client
-        
         payload = {
-            "savepath": "", # 相对路径留空，直接使用 wp_path_id
+            "savepath": "", 
             "wp_path_id": save_cid
         }
         
-        # 115 API 接收 url[0]=xxx, url[1]=xxx
         for i, url in enumerate(urls):
             payload[f"url[{i}]"] = url.strip()
 
-        # 3. 调用接口
         resp = self.client.offline_add_urls(payload)
 
         if not resp.get("state"):
              return {"success": False, "message": resp.get("error_msg") or resp.get("error"), "raw": resp}
+
+        # 注意：离线任务是异步的，文件此时可能并未下载完成。
+        # 但 P115StrmHelper 的 api_strm_sync_create_by_path 是扫描目录。
+        # 如果下载很快（如秒传），现在扫描是有效的。
+        # 如果下载很慢，可能需要后续再次扫描。
+        try:
+            notify_path = save_path_str if save_path_str else settings.P115_DOWNLOAD_PATH
+            if notify_path:
+                strm_service.notify_gen_by_path(notify_path)
+        except Exception as e:
+             print(f"Failed to trigger STRM gen: {e}")
 
         return {"success": True, "message": "Tasks added successfully", "raw": resp}
 

@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     P115_COOKIE: str = ""
     P115_SAVE_PATH: str = ""
     P115_DOWNLOAD_PATH: str = ""
+    MOVIEPILOT_URL: Optional[str] = None
+    MOVIEPILOT_APIKEY: Optional[str] = None
 
     class Config:
         env_file = ".env"
