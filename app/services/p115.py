@@ -22,19 +22,17 @@ class P115Service:
 
     def get_target_cid(self, path_config: str, manual_cid: Optional[str] = None) -> int:
         """
-        获取目标目录 CID。参考 p115strmhelper 的 get_pid_by_path 逻辑。
-        1. 如果提供了 manual_cid，直接使用。
-        2. 否则使用 path_config，先查询是否存在，不存在则创建。
+        获取目标目录 CID。
         """
         if manual_cid:
             return int(manual_cid)
         
         path_str = path_config
-        if not path_str or path_str == "/":
+        # 如果配置明确是根目录，直接返回 0
+        if not path_str or path_str == "/" or path_str == "\\":
             return 0
             
-        # 规范化路径，确保以 / 开头 (fs_dir_getid 需要)
-        # 但 fs_makedirs_app 接受相对路径或绝对路径，这里统一处理
+        # 规范化路径
         path_obj = Path(path_str)
         path = path_obj.as_posix()
         if not path.startswith("/"):
@@ -43,42 +41,56 @@ class P115Service:
         # 1. 尝试直接获取 ID
         resp = self.client.fs_dir_getid(path)
         
-        # 检查响应 (参考 plugins.v2/p115strmhelper/core/p115.py)
         pid = -1
         if resp.get("state"):
-             pid = resp.get("id", -1)
-             # 有些情况可能返回 data 结构
-             if pid == -1 and "data" in resp:
-                 data = resp["data"]
-                 if isinstance(data, dict):
-                     pid = data.get("id", -1)
+             # 尝试提取 ID 并转换为 int
+             try:
+                 val = resp.get("id")
+                 if val is None and "data" in resp:
+                     data = resp["data"]
+                     if isinstance(data, dict):
+                         val = data.get("id")
+                 
+                 # 确保转换为整数
+                 if val is not None:
+                     pid = int(val)
+             except (ValueError, TypeError):
+                 pid = -1
 
-        # 如果获取到了有效的非0 ID，直接返回
-        if pid != -1:
-            return int(pid)
+        # 如果 pid == 0，说明 api 可能返回了根目录，但我们明确请求的是子目录
+        if pid > 0:
+            return pid
 
-        # 2. 如果不存在 (pid 为 -1 或 0)，则尝试创建
-        # 注意：fs_makedirs_app 的 pid=0 表示在根目录下创建完整路径
-        # 去除开头的 /，因为 fs_makedirs_app 习惯处理 "Downloads/Share" 这种形式
+        # 2. 如果不存在，则尝试创建
+        # 注意：fs_makedirs_app 的 pid=0 表示在根目录下创建
         create_path = path_str.strip("/")
-        
+        if not create_path: # 防止为空字符串
+            return 0
+            
         resp = self.client.fs_makedirs_app(create_path, pid=0)
         
         if not resp.get("state"):
              raise ValueError(f"Failed to create path '{create_path}': {resp.get('error')}")
 
         # 解析创建后的 CID
-        cid = resp.get("cid")
-        if cid is None and "data" in resp:
-             # 兼容不同版本的返回
-             data = resp["data"]
-             if isinstance(data, dict):
-                 cid = data.get("id") or data.get("file_id")
-             elif isinstance(data, list) and len(data) > 0:
-                 cid = data[-1].get("id")
+        cid = None
+        # 尝试提取 CID 并转换为 int
+        try:
+            cid_val = resp.get("cid")
+            if cid_val is None and "data" in resp:
+                 data = resp["data"]
+                 if isinstance(data, dict):
+                     cid_val = data.get("id") or data.get("file_id")
+                 elif isinstance(data, list) and len(data) > 0:
+                     cid_val = data[-1].get("id")
+            
+            if cid_val is not None:
+                cid = int(cid_val)
+        except (ValueError, TypeError):
+            pass
         
         if cid is not None:
-            return int(cid)
+            return cid
 
         raise ValueError(f"Failed to resolve CID for path '{path}'. Response: {resp}")
 

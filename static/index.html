@@ -1205,6 +1205,7 @@
                     
                     if (res.ok) {
                         showToast({ message: json.message, type: 'success' });
+                        await refreshSubscriptions();
                         showSubscribeModal.value = false;
                     } else {
                         showToast({ message: '订阅失败: ' + json.detail, type: 'error' });
