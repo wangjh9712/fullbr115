@@ -52,13 +52,33 @@ def get_movie_resources(
     source_type: Optional[str] = Query(None, description="'115_share', 'magnet', 'ed2k'")
 ):
     """获取电影资源：整合 115分享 + 磁力 + Ed2k"""
-    results = nullbr_service.fetch_movie(tmdb_id)
-    return _filter_results(results, min_resolution, require_zh, source_type)
+    try:
+        results = nullbr_service.fetch_movie(tmdb_id)
+        return _filter_results(results, min_resolution, require_zh, source_type)
+    except Exception as e:
+        if "429" in str(e):
+            # 返回 429 状态码给前端
+            raise HTTPException(
+                status_code=429, 
+                detail="Nullbr API 速率限制，请稍后再试。"
+            )
+        # 其他错误返回 500 或保持原样
+        raise HTTPException(status_code=500, detail=str(e))
 
 # --- 电视剧接口 ---
 @router.get("/tv/{tmdb_id}", response_model=List[MediaResource])
 def get_tv_packs(tmdb_id: int):
-    return nullbr_service.fetch_tv_packs(tmdb_id)
+    try:
+        return nullbr_service.fetch_tv_packs(tmdb_id)
+    except Exception as e:
+        if "429" in str(e):
+            # 返回 429 状态码给前端
+            raise HTTPException(
+                status_code=429, 
+                detail="Nullbr API 速率限制，请稍后再试。"
+            )
+        # 其他错误返回 500 或保持原样
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/tv/{tmdb_id}/season/{season_number}", response_model=List[MediaResource])
 def get_tv_season_resources(
@@ -68,7 +88,17 @@ def get_tv_season_resources(
     require_zh: bool = Query(False)
 ):
     results = nullbr_service.fetch_tv_season(tmdb_id, season_number)
-    return _filter_results(results, min_resolution, require_zh, None)
+    try:
+        return _filter_results(results, min_resolution, require_zh, None)
+    except Exception as e:
+        if "429" in str(e):
+            # 返回 429 状态码给前端
+            raise HTTPException(
+                status_code=429, 
+                detail="Nullbr API 速率限制，请稍后再试。"
+            )
+        # 其他错误返回 500 或保持原样
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/tv/{tmdb_id}/season/{season_number}/episode/{episode_number}", response_model=List[MediaResource])
 def get_tv_episode_resources(
@@ -79,4 +109,14 @@ def get_tv_episode_resources(
     require_zh: bool = Query(False)
 ):
     results = nullbr_service.fetch_tv_episode(tmdb_id, season_number, episode_number)
-    return _filter_results(results, min_resolution, require_zh, None)
+    try:
+        return _filter_results(results, min_resolution, require_zh, None)
+    except Exception as e:
+        if "429" in str(e):
+            # 返回 429 状态码给前端
+            raise HTTPException(
+                status_code=429, 
+                detail="Nullbr API 速率限制，请稍后再试。"
+            )
+        # 其他错误返回 500 或保持原样
+        raise HTTPException(status_code=500, detail=str(e))

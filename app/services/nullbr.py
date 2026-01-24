@@ -63,6 +63,8 @@ class NullbrService:
             if r3 and r3.ed2k: resources.extend([self._parse_sdk_item(i, 'ed2k') for i in r3.ed2k])
         except Exception as e:
             print(f"Error fetching movie resources for {tmdb_id}: {e}")
+            if "429" in str(e):
+                raise e
         return resources
 
     def fetch_tv_packs(self, tmdb_id: int) -> List[MediaResource]:
@@ -74,6 +76,8 @@ class NullbrService:
                 return [self._parse_sdk_item(i, '115_share') for i in r.items]
         except Exception as e:
             print(f"Error fetching TV packs for {tmdb_id}: {e}")
+            if "429" in str(e):
+                raise e
         return []
 
     def fetch_tv_season(self, tmdb_id: int, season_number: int) -> List[MediaResource]:
@@ -86,6 +90,8 @@ class NullbrService:
                 resources.extend([self._parse_sdk_item(i, 'magnet') for i in r.magnet])
         except Exception as e:
             print(f"Error fetching TV Season {season_number}: {e}")
+            if "429" in str(e):
+                raise e
         return resources
 
     def fetch_tv_episode(self, tmdb_id: int, season_number: int, episode_number: int) -> List[MediaResource]:
@@ -102,6 +108,8 @@ class NullbrService:
                 resources.extend([self._parse_sdk_item(i, 'ed2k') for i in r_ed2k.ed2k])
         except Exception as e:
             print(f"Error fetching TV Episode S{season_number}E{episode_number}: {e}")
+            if "429" in str(e):
+                raise e
         return resources
 
     # --- 资源性检查 ---
