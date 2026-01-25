@@ -6,13 +6,20 @@ from app.routers import meta, resources, p115, subscription
 from app.services.subscription import subscription_service
 import asyncio
 
+background_tasks = set()
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    print("Triggering lifespan startup event...") # 添加日志验证是否触发
     task = asyncio.create_task(subscription_service.start_scheduler())
+    background_tasks.add(task)
+    task.add_done_callback(background_tasks.discard)
+
     yield
+
     task.cancel()
 
-app = FastAPI(title="Fullbr115")
+app = FastAPI(title="Fullbr115", lifespan=lifespan)
 
 app.include_router(meta.router)
 app.include_router(resources.router)

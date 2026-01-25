@@ -170,18 +170,23 @@ class SubscriptionService:
     async def check_all_subscriptions(self):
         now = datetime.now()
         updated = False
-        
+        print(f"[Scheduler] Waking up at {now.strftime('%H:%M:%S')}, checking {len(self.subscriptions)} subscriptions...")
+
         for sub in self.subscriptions:
             if sub.status == 'completed': continue
             
             if sub.next_check_time:
                 try:
                     check_time = datetime.strptime(sub.next_check_time, "%Y-%m-%d %H:%M:%S")
-                    if now < check_time: continue
-                except: pass
+                    if now < check_time:
+                        print(f"  - [Skip] {sub.title}: Wait until {sub.next_check_time}")
+                        continue
+                except Exception as e:
+                    print(f"  - [Error] Date parse failed for {sub.title}: {e}")
+                    pass
 
-            print(f"Checking subscription: {sub.title} ({sub.media_type})")
-            
+            print(f"  > [Run] Checking updates for: {sub.title} ({sub.media_type})")
+
             try:
                 if sub.media_type == 'movie':
                     await self._process_movie(sub)
@@ -190,12 +195,18 @@ class SubscriptionService:
                 
                 updated = True
                 sub.last_check_time = now.strftime("%Y-%m-%d %H:%M:%S")
+                
             except Exception as e:
                 print(f"Error checking {sub.title}: {e}")
                 sub.message = f"检查出错: {str(e)}"
+                sub.next_check_time = (now + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+                updated = True
         
         if updated:
             self._save_data()
+            print("[Scheduler] Data saved.")
+        else:
+            print("[Scheduler] No changes needed.")
 
     async def _process_movie(self, sub: Subscription):
         today_str = datetime.now().strftime("%Y-%m-%d")
