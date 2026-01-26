@@ -1,4 +1,4 @@
-from tmdbv3api import TMDb, Movie, TV, Search, Discover, Genre as TMDBGenre, Season as TMDBSeason
+from tmdbv3api import TMDb, Movie, TV, Search, Discover, Genre as TMDBGenre, Season as TMDBSeason, Trending
 from app.core.config import settings
 from app.models.schemas import (
     MediaMeta, MediaDetail, SearchResult, 
@@ -24,6 +24,7 @@ class TMDBService:
         self.discover_api = Discover()
         self.genre_api = TMDBGenre()
         self.season_api = TMDBSeason()
+        self.trending_api = Trending()
 
     def _ensure_list(self, obj: Any) -> List:
         """强制转为 List"""
@@ -61,8 +62,10 @@ class TMDBService:
         
         g_ids = self._ensure_list(self._get_attr(item, 'genre_ids', []))
 
+        tmdb_id_val = self._get_attr(item, 'id', 0)
+
         return MediaMeta(
-            tmdb_id=item.id,
+            tmdb_id=tmdb_id_val,
             title=title,
             original_title=orig_title,
             media_type=m_type,
@@ -101,6 +104,43 @@ class TMDBService:
                     profile_path=self._get_image_url(self._get_attr(c, 'profile_path'))
                 ))
         return directors, cast
+
+    def get_trending(self, media_type: str, time_window: str = "day") -> List[MediaMeta]:
+        """
+        获取趋势列表
+        :param media_type: 'movie', 'tv', or 'all'
+        :param time_window: 'day' or 'week'
+        """
+        results = []
+        try:
+            if media_type == 'movie':
+                if time_window == 'week':
+                    results = self.trending_api.movie_week()
+                else:
+                    results = self.trending_api.movie_day()
+            elif media_type == 'tv':
+                if time_window == 'week':
+                    results = self.trending_api.tv_week()
+                else:
+                    results = self.trending_api.tv_day()
+            elif media_type == 'all':
+                if time_window == 'week':
+                    results = self.trending_api.all_week()
+                else:
+                    results = self.trending_api.all_day()
+            
+            items = []
+            if hasattr(results, 'results'):
+                items = results.results
+            elif isinstance(results, dict) and 'results' in results:
+                items = results['results']
+            else:
+                items = self._ensure_list(results)
+
+            return [self._parse_basic(item, media_type if media_type != 'all' else None) for item in items]
+        except Exception as e:
+            print(f"Error fetching trending: {e}")
+            return []
 
     def get_details_full(self, media_type: str, tmdb_id: int) -> MediaDetail:
         append_str = "credits,recommendations,similar"

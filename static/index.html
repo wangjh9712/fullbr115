@@ -89,6 +89,48 @@
             text-shadow: 0 1px 2px rgba(0,0,0,0.8);
             font-weight: 600;
         }
+        /* 自定义横向滚动条 - 鼠标悬停变粗效果 */
+        .hover-scrollbar {
+            overflow-x: auto;
+            scrollbar-width: thin; /* Firefox */
+            scrollbar-color: #e5e7eb transparent;
+        }
+        /* Webkit (Chrome/Safari) 滚动条样式 */
+        .hover-scrollbar::-webkit-scrollbar {
+            height: 4px; /* 默认细线 */
+            background: transparent;
+        }
+        .hover-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+            border-top: 1px solid rgba(0,0,0,0.05); /* 极细的分界线效果 */
+        }
+        .hover-scrollbar::-webkit-scrollbar-thumb {
+            background-color: #d1d5db;
+            border-radius: 20px;
+        }
+        /* 悬停容器时，滚动条变粗 */
+        .hover-scrollbar:hover::-webkit-scrollbar {
+            height: 8px; 
+        }
+        .hover-scrollbar:hover::-webkit-scrollbar-thumb {
+            background-color: #9ca3af;
+        }
+
+        /* 拖拽时禁止选中文字 */
+        .grab-active {
+            cursor: grabbing !important;
+            user-select: none;
+        }
+        .grab-cursor {
+            cursor: grab;
+        }
+
+        /* 评分圈 SVG 动画 */
+        .rating-circle circle {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
     </style>
 </head>
 <body class="bg-gray-100 dark:bg-emby-dark text-gray-900 dark:text-gray-100 transition-colors duration-300 font-sans">
@@ -179,13 +221,44 @@
                 </div>
                 
                 <div class="hidden md:flex flex-1 max-w-lg mx-8">
-                    <div class="relative w-full">
+                    <div class="relative w-full group">
                         <span class="absolute inset-y-0 left-0 flex items-center pl-3">
                             <i class="fa-solid fa-search text-gray-400"></i>
                         </span>
                         <input type="text" v-model="searchQuery" @keyup.enter="performSearch"
+                            @focus="showSearchTrending = true" 
+                            @blur="handleSearchBlur"
                             class="w-full bg-gray-100 dark:bg-gray-800 rounded-full py-2 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-emby-accent transition"
                             placeholder="搜索电影、剧集...">
+                        
+                        <div v-if="showSearchTrending && !searchQuery && trendingList.length > 0" 
+                            class="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden z-[60] animate-fade-in">
+                            <div class="p-3 border-b border-gray-100 dark:border-gray-700">
+                                <h3 class="text-sm font-bold flex items-center text-gray-700 dark:text-gray-200">
+                                    <i class="fa-solid fa-arrow-trend-up text-red-500 mr-2"></i> 趋势
+                                </h3>
+                            </div>
+                            <div class="max-h-[60vh] overflow-y-auto custom-scrollbar py-1">
+                                <div v-for="(item, index) in trendingList.slice(0, 10)" :key="item.tmdb_id"
+                                    @click="goToDetail(item.tmdb_id, item.media_type)"
+                                    class="flex items-center px-4 py-2.5 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors group/item">
+                                    
+                                    <span class="w-6 text-center text-gray-400 group-hover/item:text-emby-accent mr-2 text-xs">
+                                        <i class="fa-solid fa-magnifying-glass"></i>
+                                    </span>
+                                    
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center text-sm font-medium text-gray-800 dark:text-gray-200 truncate">
+                                            {{ item.title }}
+                                            <span v-if="item.original_title && item.original_title !== item.title" 
+                                                class="ml-2 text-xs text-gray-400 truncate hidden sm:inline">
+                                                ({{ item.original_title }})
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -202,10 +275,27 @@
                 </div>
             </div>
             
-            <div v-if="showMobileSearch" class="md:hidden pb-4">
+            <div v-if="showMobileSearch" class="md:hidden pb-4 relative">
                 <input type="text" v-model="searchQuery" @keyup.enter="performSearch"
+                    @focus="showSearchTrending = true"
+                    @blur="handleSearchBlur"
                     class="w-full bg-gray-100 dark:bg-gray-800 rounded-lg py-2 px-4 text-sm focus:outline-none focus:ring-2 focus:ring-emby-accent"
                     placeholder="搜索...">
+                    
+                <div v-if="showSearchTrending && !searchQuery && trendingList.length > 0" 
+                    class="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-100 dark:border-gray-700 z-[60] max-h-[50vh] overflow-y-auto">
+                    <div class="p-3 border-b border-gray-100 dark:border-gray-700">
+                        <h3 class="text-xs font-bold flex items-center text-gray-500">
+                            <i class="fa-solid fa-arrow-trend-up mr-2"></i> 热门搜索
+                        </h3>
+                    </div>
+                    <div v-for="item in trendingList.slice(0, 8)" :key="item.tmdb_id"
+                        @click="goToDetail(item.tmdb_id, item.media_type)"
+                        class="flex items-center px-4 py-3 border-b border-gray-50 dark:border-gray-700/50 last:border-0 active:bg-gray-100 dark:active:bg-gray-700">
+                        <i class="fa-solid fa-search text-gray-300 mr-3 text-xs"></i>
+                        <span class="text-sm truncate text-gray-700 dark:text-gray-200">{{ item.title }}</span>
+                    </div>
+                </div>
             </div>
         </div>
     </nav>
@@ -260,6 +350,87 @@
         <div v-if="currentView === 'home' || currentView === 'search'" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             
             <div v-if="currentView === 'home'" class="mb-8 space-y-4">
+                <div class="mb-8 animate-fade-in relative group/section">
+                    <div class="flex items-center justify-between mb-4 px-1">
+                        <h2 class="text-xl font-bold flex items-center">
+                            <i class="fa-solid fa-fire text-red-500 mr-2"></i> 热门趋势
+                        </h2>
+                        
+                        <div class="flex bg-gray-200 dark:bg-gray-800 rounded-full p-1 relative text-xs font-bold sm:text-sm shadow-inner">
+                            <div class="absolute top-1 bottom-1 rounded-full bg-white text-black dark:bg-gray-600 dark:text-white shadow-sm transition-all duration-300 ease-out"
+                                :style="{ 
+                                    left: trendingTimeWindow === 'day' ? '4px' : '50%', 
+                                    width: 'calc(50% - 4px)' 
+                                }">
+                            </div>
+                            
+                            <button @click="switchTrendingWindow('day')" 
+                                    class="relative z-10 px-3 py-1 rounded-full transition-colors duration-300 w-16 sm:w-20 text-center"
+                                    :class="trendingTimeWindow === 'day' ? 'text-black dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'">
+                                今日
+                            </button>
+                            <button @click="switchTrendingWindow('week')" 
+                                    class="relative z-10 px-3 py-1 rounded-full transition-colors duration-300 w-16 sm:w-20 text-center"
+                                    :class="trendingTimeWindow === 'week' ? 'text-black dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'">
+                                本周
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex overflow-x-auto space-x-4 pb-4 px-1 pt-2 hide-scrollbar scroll-smooth hover-scrollbar grab-cursor" 
+                        ref="trendingContainer"
+                        :class="{ 'grab-active': isDragging }"
+                        @mousedown="startDrag"
+                        @mousemove="onDrag"
+                        @mouseup="stopDrag"
+                        @mouseleave="stopDrag">
+                        
+                        <div v-if="trendingLoading" v-for="i in 6" :key="i" class="flex-shrink-0 w-32 sm:w-40">
+                            <div class="aspect-[2/3] bg-gray-200 dark:bg-gray-800 rounded-lg animate-pulse"></div>
+                            <div class="mt-2 h-4 bg-gray-200 dark:bg-gray-800 rounded w-3/4 animate-pulse"></div>
+                        </div>
+
+                        <div v-else v-for="item in trendingList" :key="item.tmdb_id" 
+                            class="flex-shrink-0 w-32 sm:w-40 relative transition-transform duration-300 hover:scale-[1.02] select-none"
+                            @click="handleTrendClick($event, item.tmdb_id, item.media_type)">
+                            
+                            <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden shadow-md bg-gray-200 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                                <img :src="item.poster_path || 'https://via.placeholder.com/300x450?text=No+Image'" 
+                                    class="w-full h-full object-cover pointer-events-none" 
+                                    loading="lazy">
+                                
+                                <div class="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded text-[10px] font-bold shadow-sm uppercase tracking-wider backdrop-blur-md"
+                                    :class="item.media_type === 'movie' ? 'bg-blue-500/80 text-white' : 'bg-purple-500/80 text-white'">
+                                    {{ item.media_type === 'movie' ? '电影' : '剧集' }}
+                                </div>
+
+                                <div class="absolute bottom-2 left-2 w-10 h-10 rounded-full bg-emby-dark/90 p-0.5 shadow-lg backdrop-blur-sm">
+                                <div class="relative w-full h-full flex items-center justify-center">
+                                        <svg class="rating-circle w-full h-full" viewBox="0 0 36 36">
+                                            <path class="text-gray-700" 
+                                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
+                                                fill="none" stroke="currentColor" stroke-width="3" />
+                                            <path :stroke="getRatingColor(item.vote_average)"
+                                                :stroke-dasharray="100" 
+                                                :stroke-dashoffset="100 - (item.vote_average * 10)"
+                                                d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" 
+                                                fill="none" stroke-width="3" stroke-linecap="round" />
+                                        </svg>
+                                        <span class="absolute text-[10px] font-bold text-white">
+                                            {{ item.vote_average > 0 ? item.vote_average.toFixed(1) : 'NR' }}
+                                        </span>
+                                </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-2 px-1">
+                                <h3 class="text-sm font-bold truncate text-gray-800 dark:text-gray-100 group-hover:text-emby-accent transition-colors" :title="item.title">
+                                    {{ item.title }}
+                                </h3>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="flex items-center space-x-6 border-b border-gray-200 dark:border-gray-800 pb-2">
                     <button v-for="type in ['movie', 'tv']" :key="type"
                         @click="switchMediaType(type)"
@@ -268,7 +439,6 @@
                         {{ type === 'movie' ? '电影' : '剧集' }}
                     </button>
                 </div>
-
                 <div class="bg-white dark:bg-emby-card rounded-xl shadow-sm p-4 text-sm">
                     <div class="flex flex-wrap gap-4 items-center justify-between">
                         <div class="flex flex-wrap gap-3 items-center w-full lg:w-auto">
@@ -1038,12 +1208,22 @@
             const genres = ref([]);
             const searchQuery = ref('');
             const currentPage = ref(1);
+            const showSearchTrending = ref(false);
             const detailData = ref(null);
-            
+            const trendingList = ref([]);
+            const trendingLoading = ref(false);
+            const trendingTimeWindow = ref('week');
+            const trendingContainer = ref(null);
+
             const selectedSeasonNumber = ref(null);
             const currentSeasonData = ref(null);
             const raw115Resources = ref([]);
             
+            const isDragging = ref(false);
+            const startX = ref(0);
+            const scrollLeft = ref(0);
+            const isDragMove = ref(false);
+
             // Refs for Scrolling
             const seasonTabsContainer = ref(null);
             const seasonTabsRefs = ref({});
@@ -1144,6 +1324,13 @@
                     if (filters.value.dateRange) { params.append('start_date', filters.value.dateRange.start); params.append('end_date', filters.value.dateRange.end); }
                 } else if (currentView.value === 'search') { params.append('query', searchQuery.value); }
                 return `${base}?${params.toString()}`;
+            };
+
+            const handleSearchBlur = () => {
+                // 延迟 200ms 隐藏，否则点击下拉项时会先触发 blur 导致点击无效
+                setTimeout(() => {
+                    showSearchTrending.value = false;
+                }, 200);
             };
 
             const isSubscribed = computed(() => {
@@ -1263,6 +1450,66 @@
                 }
             };
 
+            const fetchTrending = async () => {
+                trendingLoading.value = true;
+                try {
+                    const url = `/tmdb/trending/all/${trendingTimeWindow.value}`;
+                    const data = await fetchWithCache(url);
+                    trendingList.value = data || [];
+                } catch (e) {
+                    console.error("Fetch trending failed", e);
+                } finally {
+                    trendingLoading.value = false;
+                }
+            };
+
+            const switchTrendingWindow = (window) => {
+                if (trendingTimeWindow.value === window) return;
+                trendingTimeWindow.value = window;
+                fetchTrending();
+            };
+
+            const startDrag = (e) => {
+                isDragging.value = true;
+                isDragMove.value = false;
+                // 获取容器
+                const slider = trendingContainer.value;
+                startX.value = e.pageX - slider.offsetLeft;
+                scrollLeft.value = slider.scrollLeft;
+            };
+
+            const onDrag = (e) => {
+                if (!isDragging.value) return;
+                e.preventDefault();
+                isDragMove.value = true; // 标记发生了移动
+                const slider = trendingContainer.value;
+                const x = e.pageX - slider.offsetLeft;
+                const walk = (x - startX.value) * 1.5; // * 1.5 加快滑动速度
+                slider.scrollLeft = scrollLeft.value - walk;
+            };
+
+            const stopDrag = () => {
+                isDragging.value = false;
+            };
+
+            // 防止拖拽结束时误触发点击事件
+            const handleTrendClick = (e, id, type) => {
+                if (isDragMove.value) {
+                    // 如果是拖拽操作，阻止点击跳转
+                    e.preventDefault();
+                    e.stopPropagation();
+                    isDragMove.value = false; 
+                } else {
+                    goToDetail(id, type);
+                }
+            };
+
+            const getRatingColor = (score) => {
+                if (score >= 8) return '#21d07a'; // Green
+                if (score >= 6) return '#d2d531'; // Yellow
+                return '#db2360'; // Red
+            };
+
             const refreshData = async () => {
                 loading.value = true;
                 mediaList.value = [];
@@ -1280,10 +1527,8 @@
                 filters.value.selectedGenres = []; 
                 
                 if (type === 'movie') {
-                    // 电影默认为“最热门”
                     filters.value.sortBy = 'popularity.desc';
                 } else {
-                    // 剧集默认为“最新上映”
                     filters.value.sortBy = 'primary_release_date.desc';
                 }
                 
@@ -1387,13 +1632,14 @@
                 } else { isDark.value = false; }
                 loadGenres();
                 refreshData();
+                fetchTrending();
             });
 
             return {
                 currentView, isDark, toggleTheme, mediaType, switchMediaType, mediaList, loading,
-                searchQuery, performSearch, goHome, goBack, currentPage, changePage,
+                searchQuery, performSearch, goHome, goBack, currentPage, changePage, showSearchTrending, handleSearchBlur,
                 filters, genres, dateRanges, refreshData, showAdvancedFilters, toggleGenre, toggleDateRange, languageOptions, toggleLanguage,
-                goToDetail, detailData,
+                goToDetail, detailData, trendingList, trendingLoading, switchTrendingWindow, trendingTimeWindow, trendingContainer, isDragging, startDrag, onDrag, stopDrag, handleTrendClick, getRatingColor,
                 selectedSeasonNumber, currentSeasonData, selectSeason,
                 showEpisodeModal, openEpisodeModal, closeEpisodeModal, currentEpisode, showMobileSearch,
                 subscriptionList, refreshSubscriptions, isSubscribed, toggleSubscribe,

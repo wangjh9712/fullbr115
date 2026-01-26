@@ -2,7 +2,7 @@ from fastapi import APIRouter, Query, Path, HTTPException
 from typing import Optional, List
 from app.services.tmdb import tmdb_service
 from app.services.nullbr import nullbr_service
-from app.models.schemas import SearchResult, MediaDetail, Season, Genre
+from app.models.schemas import SearchResult, MediaDetail, Season, Genre, MediaMeta
 
 router = APIRouter(prefix="/tmdb", tags=["Metadata"])
 
@@ -44,6 +44,16 @@ async def discover_media(
         min_vote_count=min_vote_count,
         with_original_language=with_original_language
     )
+
+@router.get("/trending/{media_type}/{time_window}", response_model=List[MediaMeta])
+async def get_trending_media(
+    media_type: str = Path(..., pattern="^(movie|tv|all)$"),
+    time_window: str = Path(..., pattern="^(day|week)$")
+):
+    """
+    获取今日或本周的趋势 (Trending)
+    """
+    return tmdb_service.get_trending(media_type, time_window)
 
 # --- 搜索 Search ---
 @router.get("/search", response_model=SearchResult)
