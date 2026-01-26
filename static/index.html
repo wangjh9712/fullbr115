@@ -520,45 +520,56 @@
                 <div class="text-sm text-gray-500">搜索结果: "{{ searchQuery }}"</div>
             </div>
 
-            <div v-if="loading" class="flex justify-center py-20">
+            <div v-if="currentView === 'search'" class="mb-6 flex items-center justify-between">...</div>
+
+            <div v-if="loading && mediaList.length === 0" class="flex justify-center py-20">
                 <i class="fa-solid fa-circle-notch fa-spin text-4xl text-emby-accent"></i>
             </div>
-            
-            <div v-else-if="mediaList.length === 0" class="text-center py-20 text-gray-500">
+
+            <div v-else-if="mediaList.length === 0 && !loading" class="text-center py-20 text-gray-500">
                 <i class="fa-solid fa-film text-6xl mb-4 opacity-30"></i>
                 <p>没有找到相关内容</p>
             </div>
 
-            <div v-else class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6">
-                <div v-for="item in mediaList" :key="item.tmdb_id" 
-                    class="group relative cursor-pointer flex flex-col transition-transform duration-300 hover:scale-105"
-                    @click="goToDetail(item.tmdb_id, item.media_type)">
-                    
-                    <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden shadow-lg bg-gray-200 dark:bg-gray-800">
-                        <img :src="item.poster_path || 'https://via.placeholder.com/300x450?text=No+Image'" 
-                             class="w-full h-full object-cover transition duration-500 group-hover:brightness-110"
-                             loading="lazy">
-                        <div class="absolute top-2 right-2 bg-black/70 text-white text-xs font-bold px-1.5 py-0.5 rounded backdrop-blur-sm">
-                            {{ item.vote_average.toFixed(1) }}
+            <div v-show="mediaList.length > 0">
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6">
+                    <div v-for="item in mediaList" :key="item.tmdb_id" 
+                        class="group relative cursor-pointer flex flex-col transition-transform duration-300 hover:scale-105"
+                        @click="goToDetail(item.tmdb_id, item.media_type)">
+                        
+                        <div class="relative w-full aspect-[2/3] rounded-lg overflow-hidden shadow-lg bg-gray-200 dark:bg-gray-800">
+                            <img :src="item.poster_path || 'https://via.placeholder.com/300x450?text=No+Image'" 
+                                class="w-full h-full object-cover transition duration-500 group-hover:brightness-110"
+                                loading="lazy">
+                            <div class="absolute top-2 right-2 bg-black/70 text-white text-xs font-bold px-1.5 py-0.5 rounded backdrop-blur-sm">
+                                {{ item.vote_average.toFixed(1) }}
+                            </div>
                         </div>
-                    </div>
 
-                    <div class="mt-2 px-1">
-                        <h3 class="text-sm font-bold truncate text-gray-800 dark:text-gray-100 group-hover:text-emby-accent transition-colors">
-                            {{ item.title }}
-                        </h3>
-                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                            {{ item.release_date ? item.release_date.split('-')[0] : '' }}
+                        <div class="mt-2 px-1">
+                            <h3 class="text-sm font-bold truncate text-gray-800 dark:text-gray-100 group-hover:text-emby-accent transition-colors">
+                                {{ item.title }}
+                            </h3>
+                            <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                {{ item.release_date ? item.release_date.split('-')[0] : '' }}
+                            </div>
                         </div>
                     </div>
                 </div>
+
+                <div ref="loadTrigger" class="py-8 w-full flex justify-center items-center min-h-[60px]">
+                    <div v-if="loading" class="flex items-center space-x-2 text-gray-500 dark:text-gray-400">
+                        <i class="fa-solid fa-circle-notch fa-spin"></i>
+                        <span class="text-sm">正在加载更多...</span>
+                    </div>
+                    <div v-else-if="!hasMore" class="text-xs text-gray-400 dark:text-gray-600 flex items-center">
+                        <span class="w-12 h-[1px] bg-gray-300 dark:bg-gray-700 mx-2"></span>
+                        我是有底线的
+                        <span class="w-12 h-[1px] bg-gray-300 dark:bg-gray-700 mx-2"></span>
+                    </div>
+                </div>
             </div>
-            
-            <div class="mt-8 flex justify-center space-x-4" v-if="mediaList.length > 0">
-                <button @click="changePage(-1)" :disabled="currentPage === 1" class="px-3 py-1 bg-white dark:bg-emby-card rounded shadow disabled:opacity-50">上一页</button>
-                <span class="px-3 py-1 font-mono">P{{ currentPage }}</span>
-                <button @click="changePage(1)" class="px-3 py-1 bg-white dark:bg-emby-card rounded shadow">下一页</button>
-            </div>
+
         </div>
 
         <div v-if="currentView === 'detail' && detailData" class="relative min-h-[calc(100vh-64px)] pb-20 animate-fade-in">
@@ -1208,6 +1219,8 @@
             const genres = ref([]);
             const searchQuery = ref('');
             const currentPage = ref(1);
+            const hasMore = ref(true);
+            const loadTrigger = ref(null);
             const showSearchTrending = ref(false);
             const detailData = ref(null);
             const trendingList = ref([]);
@@ -1510,15 +1523,53 @@
                 return '#db2360'; // Red
             };
 
-            const refreshData = async () => {
+            const loadMediaData = async (append = false) => {
+                if (loading.value) return; // 防止重复请求
+                
+                // 如果是追加模式但没有更多数据了，直接返回
+                if (append && !hasMore.value) return;
+
                 loading.value = true;
-                mediaList.value = [];
                 try {
-                    let url = currentView.value === 'search' && searchQuery.value ? buildQueryUrl('/tmdb/search') : buildQueryUrl(`/tmdb/discover/${mediaType.value}`);
-                    if (url.includes('search') && !searchQuery.value) return;
+                    // 构建 URL (逻辑不变)
+                    let url = currentView.value === 'search' && searchQuery.value 
+                        ? buildQueryUrl('/tmdb/search') 
+                        : buildQueryUrl(`/tmdb/discover/${mediaType.value}`);
+                    
+                    if (url.includes('search') && !searchQuery.value) {
+                        loading.value = false;
+                        return;
+                    }
+
                     const res = await fetchWithCache(url);
-                    mediaList.value = res.results || [];
-                } finally { loading.value = false; }
+                    const newResults = res.results || [];
+                    
+                    // 判断是否还有下一页 (如果返回数量少于 20，通常说明是最后一页)
+                    if (newResults.length < 20) {
+                        hasMore.value = false;
+                    }
+
+                    if (append) {
+                        // 追加模式：合并数组
+                        mediaList.value.push(...newResults);
+                    } else {
+                        // 重置模式：覆盖数组
+                        mediaList.value = newResults;
+                        // 如果是重置，且有数据，可以考虑滚动到顶部(可选)
+                        // if (newResults.length > 0) window.scrollTo({ top: 0, behavior: 'auto' });
+                    }
+                } catch(e) {
+                    console.error(e);
+                } finally { 
+                    loading.value = false; 
+                }
+            };
+
+            const refreshData = () => {
+                currentPage.value = 1;
+                hasMore.value = true;
+                mediaList.value = [];
+                loadMediaData(false);
             };
 
             const switchMediaType = (type) => { 
@@ -1535,9 +1586,10 @@
                 loadGenres(); 
                 refreshData(); 
             };
+
+            let observer = null;
             const toggleGenre = (id) => { const idx = filters.value.selectedGenres.indexOf(id); if (idx > -1) filters.value.selectedGenres.splice(idx, 1); else filters.value.selectedGenres.push(id); currentPage.value = 1; refreshData(); };
             const toggleDateRange = (range) => { if (filters.value.dateRange?.label === range.label) filters.value.dateRange = null; else filters.value.dateRange = range; currentPage.value = 1; refreshData(); };
-            const changePage = (d) => { currentPage.value += d; refreshData(); };
             const performSearch = () => { if(!searchQuery.value) return; currentView.value = 'search'; currentPage.value = 1; showMobileSearch.value = false; refreshData(); };
             const goHome = () => { currentView.value = 'home'; searchQuery.value = ''; currentPage.value = 1; refreshData(); };
             const goBack = () => { currentView.value = searchQuery.value ? 'search' : 'home'; };
@@ -1633,12 +1685,29 @@
                 loadGenres();
                 refreshData();
                 fetchTrending();
+                observer = new IntersectionObserver((entries) => {
+                    // 如果探测点进入视口，且不在加载中，且还有更多数据
+                    if (entries[0].isIntersecting && !loading.value && hasMore.value && mediaList.value.length > 0) {
+                        currentPage.value++;
+                        loadMediaData(true); // 执行追加加载
+                    }
+                }, {
+                    rootMargin: '200px', // 提前 200px 触发加载，体验更流畅
+                    threshold: 0.1
+                });
+
+                // 开始观察
+                if (loadTrigger.value) observer.observe(loadTrigger.value);
+            });
+
+            watch(loadTrigger, (el) => {
+                if (el && observer) observer.observe(el);
             });
 
             return {
                 currentView, isDark, toggleTheme, mediaType, switchMediaType, mediaList, loading,
-                searchQuery, performSearch, goHome, goBack, currentPage, changePage, showSearchTrending, handleSearchBlur,
-                filters, genres, dateRanges, refreshData, showAdvancedFilters, toggleGenre, toggleDateRange, languageOptions, toggleLanguage,
+                searchQuery, performSearch, goHome, goBack, currentPage, showSearchTrending, handleSearchBlur,
+                filters, genres, dateRanges, hasMore, loadTrigger, refreshData, showAdvancedFilters, toggleGenre, toggleDateRange, languageOptions, toggleLanguage,
                 goToDetail, detailData, trendingList, trendingLoading, switchTrendingWindow, trendingTimeWindow, trendingContainer, isDragging, startDrag, onDrag, stopDrag, handleTrendClick, getRatingColor,
                 selectedSeasonNumber, currentSeasonData, selectSeason,
                 showEpisodeModal, openEpisodeModal, closeEpisodeModal, currentEpisode, showMobileSearch,
