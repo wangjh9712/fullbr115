@@ -125,8 +125,8 @@ class SubscriptionService:
                 new_sub.current_episode = max(0, req.start_episode - 1)
                 new_sub.message = f"订阅至第 {req.season_number} 季，从第 {req.start_episode} 集开始"
 
-            # 2. 专属文件夹逻辑: 名称 (年份) {tmdb-id}
-            folder_name = f"{req.title} ({year_str}) {{tmdb-{req.tmdb_id}}}" if year_str else f"{req.title} {{tmdb-{req.tmdb_id}}}"
+            # 2. 专属文件夹逻辑: 名称 (年份) {tmdbid-id}
+            folder_name = f"{req.title} ({year_str}) {{tmdbid-{req.tmdb_id}}}" if year_str else f"{req.title} {{tmdbid-{req.tmdb_id}}}"
             
             base_path = settings.P115_DOWNLOAD_PATH or ""
             target_path = f"{base_path}/{folder_name}".replace("//", "/")
