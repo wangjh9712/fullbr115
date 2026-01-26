@@ -99,15 +99,23 @@ class SubscriptionService:
         )
 
         try:
-            # 1. 初始化元数据
+            # 1. 初始化元数据并确定年份
+            year_str = ""
+            
             if req.media_type == 'movie':
                 details = await asyncio.to_thread(tmdb_service.get_details_full, 'movie', req.tmdb_id)
                 new_sub.release_date = details.release_date
                 new_sub.message = f"等待上映 ({new_sub.release_date})"
+                if details.release_date:
+                    year_str = details.release_date.split('-')[0]
             else:
                 new_sub.season_number = req.season_number
                 season_info = await asyncio.to_thread(tmdb_service.get_season_details, req.tmdb_id, req.season_number)
                 new_sub.total_episodes = season_info.episode_count
+                
+                show_details = await asyncio.to_thread(tmdb_service.get_details_full, 'tv', req.tmdb_id)
+                if show_details.release_date:
+                    year_str = show_details.release_date.split('-')[0]
                 
                 air_dates = {}
                 for ep in season_info.episodes:
@@ -117,16 +125,19 @@ class SubscriptionService:
                 new_sub.current_episode = max(0, req.start_episode - 1)
                 new_sub.message = f"订阅至第 {req.season_number} 季，从第 {req.start_episode} 集开始"
 
-                # 2. 剧集专属文件夹逻辑
-                base_path = settings.P115_DOWNLOAD_PATH or ""
-                target_path = f"{base_path}/{req.title}".replace("//", "/")
-                try:
-                    cid = await asyncio.to_thread(p115_service.get_target_cid, target_path)
-                    new_sub.save_cid = str(cid)
-                    print(f"Created/Resolved folder for {req.title}: CID {cid}")
-                except Exception as e:
-                    print(f"Failed to create folder for {req.title}: {e}")
-                    new_sub.message += " (注意: 文件夹创建失败，使用默认目录)"
+            # 2. 专属文件夹逻辑: 名称 (年份) {tmdb-id}
+            folder_name = f"{req.title} ({year_str}) {{tmdb-{req.tmdb_id}}}" if year_str else f"{req.title} {{tmdb-{req.tmdb_id}}}"
+            
+            base_path = settings.P115_DOWNLOAD_PATH or ""
+            target_path = f"{base_path}/{folder_name}".replace("//", "/")
+            
+            try:
+                cid = await asyncio.to_thread(p115_service.get_target_cid, target_path)
+                new_sub.save_cid = str(cid)
+                print(f"Created/Resolved folder for {req.title}: {folder_name} (CID {cid})")
+            except Exception as e:
+                print(f"Failed to create folder for {req.title}: {e}")
+                new_sub.message += " (注意: 文件夹创建失败，使用默认目录)"
 
         except Exception as e:
             return {"success": False, "message": f"初始化失败: {str(e)}"}
@@ -134,8 +145,7 @@ class SubscriptionService:
         self.subscriptions.append(new_sub)
         self._save_data()
 
-        # 立即触发检查 (异步非阻塞建议，但这里为了确保逻辑简单，直接 await)
-        # 注意：如果追更集数多，这里可能会让前端请求 pending 几秒钟
+        # 立即触发检查
         try:
             if new_sub.media_type == 'movie':
                 await self._process_movie(new_sub)

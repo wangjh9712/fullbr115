@@ -162,17 +162,41 @@ class P115Service:
             "share_info": data.get("share_info")
         }
 
-    def save_share_files(self, share_link: str, file_ids: List[str], password: Optional[str] = None, to_cid: Optional[str] = None, save_path_str: Optional[str] = None) -> Dict[str, Any]:
+    def save_share_files(self, share_link: str, file_ids: List[str], password: Optional[str] = None, to_cid: Optional[str] = None, save_path_str: Optional[str] = None, new_directory_name: Optional[str] = None) -> Dict[str, Any]:
         """
         转存文件。
         :param save_path_str: 明确的目标路径字符串（用于 STRM 生成通知）。如果未提供且 to_cid 为空，则使用默认配置路径。
         """
         save_cid = self.get_target_cid(settings.P115_SAVE_PATH, to_cid)
+        notify_path = save_path_str if save_path_str else settings.P115_SAVE_PATH
         payload_info = share_extract_payload(share_link)
         share_code = payload_info["share_code"]
         receive_code = password if password else payload_info.get("receive_code", "")
 
         file_id_str = ",".join(file_ids) if file_ids else "0" 
+
+        if new_directory_name:
+            try:
+                # 在当前 save_cid 下创建新文件夹
+                resp = self.client.fs_makedirs_app(new_directory_name, pid=save_cid)
+                if not resp.get("state"):
+                     raise ValueError(f"Failed to create subdir '{new_directory_name}': {resp.get('error')}")
+                
+                # 提取新文件夹的 CID
+                new_cid = None
+                data = resp.get("data")
+                if isinstance(data, dict):
+                    new_cid = data.get("id") or data.get("file_id") or data.get("cid")
+                elif isinstance(data, list) and data:
+                    new_cid = data[-1].get("id")
+                
+                if new_cid:
+                    save_cid = int(new_cid) # 更新目标 CID 为新建的文件夹
+                    # 更新通知路径 (辅助功能)
+                    if notify_path:
+                        notify_path = os.path.join(notify_path, new_directory_name)
+            except Exception as e:
+                return {"success": False, "message": f"创建整理文件夹失败: {str(e)}", "raw": {}}
 
         payload = {
             "share_code": share_code,
@@ -187,14 +211,6 @@ class P115Service:
         if not resp.get("state"):
             return {"success": False, "message": resp.get("error"), "raw": resp}
         
-        try:
-            # 确定通知的路径：优先使用传入的路径，否则使用默认配置路径
-            notify_path = save_path_str if save_path_str else settings.P115_SAVE_PATH
-            if notify_path:
-                strm_service.notify_gen_by_path(notify_path)
-        except Exception as e:
-            print(f"Failed to trigger STRM gen: {e}")
-
         return {"success": True, "message": "Saved successfully", "raw": resp}
 
     def add_offline_tasks(self, urls: List[str], to_cid: Optional[str] = None, save_path_str: Optional[str] = None) -> Dict[str, Any]:

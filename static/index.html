@@ -151,7 +151,7 @@
                     :item="child" 
                     :share-link="shareLink"
                     :password="password"
-                    @notify="$emit('notify', $event)"
+                    :folder-name-template="folderNameTemplate"  @notify="$emit('notify', $event)"
                 ></tree-node>
             </template>
         </div>
@@ -449,6 +449,7 @@
                         :media-type="detailData.media_type" 
                         :availability="detailData.availability"
                         :injected-115="detailData.media_type === 'tv' ? fullSeries115 : null"
+                        :media-info="{ title: detailData.title, date: detailData.release_date, tmdb_id: detailData.tmdb_id }"
                         context="main"
                         @notify="showToast"
                     ></resource-panel>
@@ -655,7 +656,7 @@
                             }"
                             :share-link="res.link"
                             :is-root="true" 
-                            @notify="$emit('notify', $event)"
+                            :folder-name-template="isoFolderName"  @notify="$emit('notify', $event)"
                         ></tree-node>
                     </div>
                 </template>
@@ -743,7 +744,8 @@
             item: Object, 
             shareLink: String,
             password: { type: String, default: '' },
-            isRoot: { type: Boolean, default: false }
+            isRoot: { type: Boolean, default: false },
+            folderNameTemplate: { type: String, default: '' }
         },
         emits: ['notify'],
         setup(props, { emit }) {
@@ -753,6 +755,20 @@
 
             const isISO = computed(() => {
                 return props.item.name && props.item.name.toLowerCase().endsWith('.iso');
+            });
+
+            const shouldCreateFolder = computed(() => {
+                if (props.item.name.endsWith('.iso')) {
+                    console.log('ISO File:', props.item.name, 'Template:', props.folderNameTemplate);
+                }
+                return isISO.value && props.folderNameTemplate;
+            });
+
+            const saveButtonTitle = computed(() => {
+                if (shouldCreateFolder.value) {
+                    return `转存并整理到: ${props.folderNameTemplate}`;
+                }
+                return '转存到网盘';
             });
 
             const toggle = async () => {
@@ -784,7 +800,7 @@
                     if (json.state) {
                         let list = json.data.list;
                         
-                        // 智能展平逻辑：如果是根节点且只有一个子文件夹，则自动获取该子文件夹的内容
+                        // 智能展平逻辑
                         if (props.isRoot && list.length === 1 && list[0].is_dir) {
                             const subRes = await fetch('/p115/share/list', {
                                 method: 'POST',
@@ -815,15 +831,25 @@
 
             const onSave = async () => {
                 try {
-                    emit('notify', { message: '正在提交转存任务...', type: 'success' }); 
+                    // [修改] 提示语优化
+                    let msg = '正在提交转存任务...';
+                    if (shouldCreateFolder.value) {
+                        msg = `正在创建文件夹 "${props.folderNameTemplate}" 并转存...`;
+                    }
+                    emit('notify', { message: msg, type: 'success' }); 
+                    
+                    const payload = {
+                        share_link: props.shareLink,
+                        file_ids: [props.item.id],
+                        password: props.password,
+                        // [新增] 只有满足条件才传这个参数
+                        new_directory_name: shouldCreateFolder.value ? props.folderNameTemplate : null
+                    };
+
                     const res = await fetch('/p115/share/save', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            share_link: props.shareLink,
-                            file_ids: [props.item.id],
-                            password: props.password
-                        })
+                        body: JSON.stringify(payload)
                     });
                     const json = await res.json();
                     if (json.state) {
@@ -836,7 +862,7 @@
                 }
             };
 
-            return { isOpen, loading, children, toggle, onSave, isISO, formatBytes };
+            return { isOpen, loading, children, toggle, onSave, isISO, formatBytes, saveButtonTitle };
         }
     });
 
@@ -880,12 +906,23 @@
     const ResourcePanel = {
         template: '#resource-panel-template',
         components: { TreeNode },
-        props: ['tmdbId', 'mediaType', 'seasonNumber', 'episodeNumber', 'availability', 'context', 'injected115'],
+        props: ['tmdbId', 'mediaType', 'seasonNumber', 'episodeNumber', 'availability', 'context', 'injected115', 'mediaInfo'],
         emits: ['notify'],
         setup(props, { emit }) {
             const activeTab = ref('');
             const localResources = ref([]);
             const loading = ref(false);
+
+            const isoFolderName = computed(() => {
+                if (!props.mediaInfo || !props.mediaInfo.title) return '';
+                const { title, date, tmdb_id } = props.mediaInfo;
+                const year = date ? date.split('-')[0] : '';
+                
+                if (year) {
+                    return `${title} (${year}) {tmdbid-${tmdb_id}}`;
+                }
+                return `${title} {tmdbid-${tmdb_id}}`;
+            });
 
             const tabs = computed(() => {
                 const t = [];
@@ -988,7 +1025,7 @@
                 }
             });
 
-            return { activeTab, displayResources, tabs, loading, copyLink, isIso, addOfflineTask };
+            return { activeTab, displayResources, tabs, loading, copyLink, isIso, addOfflineTask, isoFolderName };
         }
     };
 

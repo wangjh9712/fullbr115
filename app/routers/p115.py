@@ -34,7 +34,8 @@ async def save_share_files(request: P115ShareSaveRequest):
             share_link=request.share_link,
             file_ids=request.file_ids,
             password=request.password,
-            to_cid=request.to_cid # 传递 manual CID
+            to_cid=request.to_cid, # 传递 manual CID
+            new_directory_name=request.new_directory_name
         )
         if not result["success"]:
             return P115Response(state=False, message=result["message"], data=result.get("raw"))

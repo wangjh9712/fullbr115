@@ -128,6 +128,7 @@ class P115ShareSaveRequest(BaseModel):
     file_ids: List[str] = Field(..., description="要转存的文件/目录ID列表")
     password: Optional[str] = Field(None, description="提取码/密码")
     to_cid: Optional[str] = Field(None, description="目标目录ID，如果不填则使用配置的 P115_SAVE_PATH") 
+    new_directory_name: Optional[str] = Field(None, description="如果不为空，将在目标目录下新建此文件夹并转存到其中")
 
 class P115OfflineAddRequest(BaseModel):
     urls: List[str] = Field(..., description="下载链接列表 (http/ftp/magnet/ed2k)")
