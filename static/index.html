@@ -758,9 +758,6 @@
             });
 
             const shouldCreateFolder = computed(() => {
-                if (props.item.name.endsWith('.iso')) {
-                    console.log('ISO File:', props.item.name, 'Template:', props.folderNameTemplate);
-                }
                 return isISO.value && props.folderNameTemplate;
             });
 
