@@ -1,0 +1,82 @@
+[v-cloak] { display: none; }
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #4b5563;
+    border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* ISO 哑光黑金风格 */
+.iso-black-gold {
+    background: linear-gradient(145deg, #3a3a3a 0%, #1f1f1f 100%);
+    border: 1px solid rgba(255, 215, 0, 0.4);
+    color: #e0e0e0;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+    position: relative;
+    overflow: hidden;
+}
+.iso-black-gold::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 215, 0, 0.4), transparent);
+}
+.iso-black-gold:hover {
+    border-color: rgba(255, 215, 0, 0.7);
+    background: linear-gradient(145deg, #454545 0%, #2a2a2a 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+}
+.iso-text-gold {
+    color: #ffd700;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+    font-weight: 600;
+}
+/* 自定义横向滚动条 - 鼠标悬停变粗效果 */
+.hover-scrollbar {
+    overflow-x: auto;
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: #e5e7eb transparent;
+}
+/* Webkit (Chrome/Safari) 滚动条样式 */
+.hover-scrollbar::-webkit-scrollbar {
+    height: 4px; /* 默认细线 */
+    background: transparent;
+}
+.hover-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+    border-top: 1px solid rgba(0,0,0,0.05); /* 极细的分界线效果 */
+}
+.hover-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #d1d5db;
+    border-radius: 20px;
+}
+/* 悬停容器时，滚动条变粗 */
+.hover-scrollbar:hover::-webkit-scrollbar {
+    height: 8px; 
+}
+.hover-scrollbar:hover::-webkit-scrollbar-thumb {
+    background-color: #9ca3af;
+}
+
+/* 拖拽时禁止选中文字 */
+.grab-active {
+    cursor: grabbing !important;
+    user-select: none;
+}
+.grab-cursor {
+    cursor: grab;
+}
