@@ -620,30 +620,67 @@ createApp({
             isDragging.value = true;
             isDragMove.value = false;
             pauseAutoPlay(); 
+            
             const slider = trendingContainer.value;
-            startX.value = e.pageX - slider.offsetLeft;
+            
+            // 1. 记录初始坐标（改用 pageX 更稳定）
+            startX.value = e.pageX;
             scrollLeft.value = slider.scrollLeft;
-            slider.style.scrollSnapType = 'none';
+            
+            // 2. 使用 setProperty + important 暴力禁用 CSS 干扰
+            // 必须禁用 snap-type，否则浏览器会一直在你拖拽时试图自动对齐
+            slider.style.setProperty('scroll-snap-type', 'none', 'important');
+            // 必须禁用 smooth，否则拖拽会有严重的延迟感（溜冰感）
+            slider.style.setProperty('scroll-behavior', 'auto', 'important');
+            
+            // 视觉反馈
+            slider.style.cursor = 'grabbing';
         };
 
         const onDrag = (e) => {
             if (!isDragging.value) return;
-            e.preventDefault();
+            e.preventDefault(); // 防止触发图片拖拽或文字选择
             isDragMove.value = true; 
+            
             const slider = trendingContainer.value;
-            const x = e.pageX - slider.offsetLeft;
-            const walk = (x - startX.value) * 1.5; 
+            
+            // 3. 实时计算位移
+            const x = e.pageX;
+            const walk = (x - startX.value) * 1.5; // 1.5 是拖拽灵敏度系数，可自行调整
+            
+            // 因为前面设置了 scroll-behavior: auto，这一步是瞬时响应，完全跟手
             slider.scrollLeft = scrollLeft.value - walk;
         };
 
         const stopDrag = () => {
-            if(isDragging.value) {
-                isDragging.value = false;
-                resumeAutoPlay(); 
-                if(trendingContainer.value) {
-                    trendingContainer.value.style.scrollSnapType = 'x mandatory';
+            if (!isDragging.value) return;
+            isDragging.value = false;
+            resumeAutoPlay(); 
+            
+            const slider = trendingContainer.value;
+            slider.style.cursor = 'grab';
+
+            // 4. 手动计算归位逻辑
+            const itemWidth = slider.offsetWidth;
+            const currentScroll = slider.scrollLeft;
+            // 计算离当前位置最近的海报索引
+            const nearestIndex = Math.round(currentScroll / itemWidth);
+            const targetScroll = nearestIndex * itemWidth;
+            
+            // 5. 启用平滑滚动，优雅地“滑”到正确位置
+            slider.style.setProperty('scroll-behavior', 'smooth', 'important');
+            slider.scrollTo({
+                left: targetScroll,
+                behavior: 'smooth'
+            });
+
+            setTimeout(() => {
+                if (trendingContainer.value) {
+                    // 移除内联样式，让 Tailwind 的 class重新生效
+                    slider.style.removeProperty('scroll-snap-type');
+                    slider.style.removeProperty('scroll-behavior');
                 }
-            }
+            }, 500);
         };
 
         const handleTrendClick = (e, id, type) => {
