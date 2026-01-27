@@ -182,19 +182,31 @@ class P115Service:
                 if not resp.get("state"):
                      raise ValueError(f"Failed to create subdir '{new_directory_name}': {resp.get('error')}")
                 
-                # 提取新文件夹的 CID
+                # 增强 CID 提取逻辑，防止漏掉 ID 导致存错位置
                 new_cid = None
-                data = resp.get("data")
-                if isinstance(data, dict):
-                    new_cid = data.get("id") or data.get("file_id") or data.get("cid")
-                elif isinstance(data, list) and data:
-                    new_cid = data[-1].get("id")
+                
+                # 1. 优先尝试从根层级获取 (部分 115 接口会直接在根级返回 cid 或 file_id)
+                new_cid = resp.get("cid") or resp.get("file_id")
+
+                # 2. 如果根层级没有，再尝试从 data 字段获取
+                if new_cid is None and "data" in resp:
+                    data = resp.get("data")
+                    if isinstance(data, dict):
+                        new_cid = data.get("id") or data.get("file_id") or data.get("cid")
+                    elif isinstance(data, list) and data:
+                        # fs_makedirs_app 如果递归创建，可能返回列表，通常最后一个是目标文件夹
+                        last_item = data[-1]
+                        new_cid = last_item.get("id") or last_item.get("file_id") or last_item.get("cid")
                 
                 if new_cid:
                     save_cid = int(new_cid) # 更新目标 CID 为新建的文件夹
                     # 更新通知路径 (辅助功能)
                     if notify_path:
                         notify_path = os.path.join(notify_path, new_directory_name)
+                else:
+                    # 如果创建成功但无法获取 ID，打印警告，文件将被存入父目录
+                    print(f"Warning: Created folder '{new_directory_name}' but failed to extract CID. Response: {resp}")
+
             except Exception as e:
                 return {"success": False, "message": f"创建整理文件夹失败: {str(e)}", "raw": {}}
 
