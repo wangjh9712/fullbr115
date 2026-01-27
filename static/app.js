@@ -312,6 +312,7 @@ createApp({
         const isDark = ref(true);
         const showMobileSearch = ref(false);
         const loading = ref(false);
+        const isNavigating = ref(false); // [New] Global Navigating State
         const mediaType = ref('movie');
         const mediaList = ref([]);
         const genres = ref([]);
@@ -591,7 +592,6 @@ createApp({
             fetchTrending();
         };
 
-        // --- Auto Play Logic ---
         const startAutoPlay = () => {
             stopAutoPlay();
             autoPlayInterval = setInterval(() => {
@@ -654,6 +654,12 @@ createApp({
             } else {
                 goToDetail(id, type);
             }
+        };
+
+        const getRatingColor = (score) => {
+            if (score >= 8) return '#21d07a'; 
+            if (score >= 6) return '#d2d531'; 
+            return '#db2360'; 
         };
 
         const loadMediaData = async (append = false) => {
@@ -719,8 +725,11 @@ createApp({
         const goHome = () => { currentView.value = 'home'; searchQuery.value = ''; currentPage.value = 1; refreshData(); };
         const goBack = () => { currentView.value = searchQuery.value ? 'search' : 'home'; };
 
+        // [Updated] goToDetail with Navigation State and Error Handling
         const goToDetail = async (id, type) => {
-            loading.value = true;
+            isNavigating.value = true; // Enable full-screen blur
+            
+            // Reset Detail States
             detailData.value = null;
             currentSeasonData.value = null;
             selectedSeasonNumber.value = null;
@@ -731,8 +740,13 @@ createApp({
             try {
                 const targetType = type || mediaType.value;
                 const data = await fetchWithCache(`/tmdb/details/${targetType}/${id}`);
+                
+                // Check if data is valid
+                if (!data) throw new Error("获取详情失败，返回数据为空");
+
                 detailData.value = data;
                 currentView.value = 'detail';
+                window.scrollTo(0, 0);
 
                 if (targetType === 'tv') {
                     fetchWithCache(`/resources/tv/${id}`).then(res => { raw115Resources.value = res || []; });
@@ -741,8 +755,15 @@ createApp({
                         selectSeason(first);
                     }
                 }
-            } catch(e) { console.error(e); } 
-            finally { loading.value = false; }
+            } catch(e) { 
+                console.error(e); 
+                showToast({ message: '加载失败: ' + (e.message || '未知错误'), type: 'error' });
+            } 
+            finally { 
+                loading.value = false; 
+                // Delay slightly to ensure smooth transition
+                setTimeout(() => { isNavigating.value = false; }, 300);
+            }
         };
 
         const selectSeason = async (season) => {
@@ -835,10 +856,10 @@ createApp({
         });
 
         return {
-            currentView, isDark, toggleTheme, mediaType, switchMediaType, mediaList, loading,
+            currentView, isDark, toggleTheme, mediaType, switchMediaType, mediaList, loading, isNavigating,
             searchQuery, performSearch, goHome, goBack, currentPage, showSearchTrending, handleSearchBlur,
             filters, genres, dateRanges, sortOptions, hasMore, loadTrigger, refreshData, showAdvancedFilters, toggleGenre, toggleDateRange, languageOptions, toggleLanguage,
-            goToDetail, detailData, trendingList, trendingLoading, switchTrendingWindow, trendingTimeWindow, trendingContainer, isDragging, startDrag, onDrag, stopDrag, handleTrendClick,
+            goToDetail, detailData, trendingList, trendingLoading, switchTrendingWindow, trendingTimeWindow, trendingContainer, isDragging, startDrag, onDrag, stopDrag, handleTrendClick, getRatingColor,
             selectedSeasonNumber, currentSeasonData, selectSeason,
             showEpisodeModal, openEpisodeModal, closeEpisodeModal, currentEpisode, showMobileSearch,
             subscriptionList, refreshSubscriptions, isSubscribed, toggleSubscribe,

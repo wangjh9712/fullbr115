@@ -7,28 +7,16 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
     <link rel="stylesheet" href="/static/style.css">
-
     <script>
         tailwind.config = {
             darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
-                        emby: {
-                            dark: '#141414',
-                            card: '#1f1f1f',
-                            accent: '#00a4dc',
-                            green: '#52b54b',
-                            red: '#e50914',
-                            gold: '#ffd700'
-                        }
+                        emby: { dark: '#141414', card: '#1f1f1f', accent: '#00a4dc', green: '#52b54b', red: '#e50914', gold: '#ffd700' }
                     },
-                    animation: {
-                        'fade-in': 'fadeIn 0.3s ease-in-out',
-                        'slide-up': 'slideUp 0.3s ease-out'
-                    },
+                    animation: { 'fade-in': 'fadeIn 0.3s ease-in-out', 'slide-up': 'slideUp 0.3s ease-out' },
                     keyframes: {
                         fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
                         slideUp: { '0%': { transform: 'translateY(10px)', opacity: '0' }, '100%': { transform: 'translateY(0)', opacity: '1' } }
@@ -202,6 +190,13 @@
 
     <div id="app" v-cloak class="min-h-screen flex flex-col relative overflow-x-hidden">
 
+        <div v-if="isNavigating" class="fixed inset-0 z-[200] bg-white/20 dark:bg-black/20 backdrop-blur-lg flex items-center justify-center transition-all duration-500 animate-fade-in">
+            <div class="text-center">
+                <i class="fa-solid fa-circle-notch fa-spin text-5xl text-emby-accent drop-shadow-lg mb-4"></i>
+                <p class="text-white font-bold text-lg drop-shadow-md tracking-widest animate-pulse">LOADING</p>
+            </div>
+        </div>
+
         <div class="fixed top-20 right-5 z-[100] space-y-3 w-80 pointer-events-none">
             <div v-for="toast in toasts" :key="toast.id" 
                  class="flex items-start p-4 rounded-lg shadow-lg text-white transform transition-all duration-300 pointer-events-auto backdrop-blur-md"
@@ -351,7 +346,30 @@
                 <div v-if="currentView === 'home'" class="mb-8 space-y-4">
                     <div class="mb-4 animate-fade-in relative group/section">
                         <div class="flex items-center justify-between mb-4 px-1">
-                             </div>
+                            <h2 class="text-xl font-bold flex items-center">
+                                <i class="fa-solid fa-fire text-red-500 mr-2"></i> 热门趋势
+                            </h2>
+                            
+                            <div class="flex bg-gray-200 dark:bg-gray-800 rounded-full p-1 relative text-xs font-bold sm:text-sm shadow-inner">
+                                <div class="absolute top-1 bottom-1 rounded-full bg-white text-black dark:bg-gray-600 dark:text-white shadow-sm transition-all duration-300 ease-out"
+                                    :style="{ 
+                                        left: trendingTimeWindow === 'day' ? '4px' : '50%', 
+                                        width: 'calc(50% - 4px)' 
+                                    }">
+                                </div>
+                                
+                                <button @click="switchTrendingWindow('day')" 
+                                        class="relative z-10 px-3 py-1 rounded-full transition-colors duration-300 w-16 sm:w-20 text-center"
+                                        :class="trendingTimeWindow === 'day' ? 'text-black dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'">
+                                    今日
+                                </button>
+                                <button @click="switchTrendingWindow('week')" 
+                                        class="relative z-10 px-3 py-1 rounded-full transition-colors duration-300 w-16 sm:w-20 text-center"
+                                        :class="trendingTimeWindow === 'week' ? 'text-black dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'">
+                                    本周
+                                </button>
+                            </div>
+                        </div>
 
                         <div class="flex overflow-x-auto snap-x snap-mandatory space-x-0 pb-4 hide-scrollbar hover-scrollbar scroll-smooth grab-cursor rounded-xl" 
                             ref="trendingContainer"
@@ -586,6 +604,47 @@
                                     {{ g.name }}
                                 </span>
                             </div>
+
+                            <div class="mb-6 animate-slide-up" v-if="(detailData.directors && detailData.directors.length) || (detailData.cast && detailData.cast.length)">
+                               
+                                <div class="flex gap-3 px-1 pb-2 overflow-x-auto md:flex-wrap md:overflow-visible hide-scrollbar hover-scrollbar">
+                                    
+                                    <template v-for="person in detailData.directors" :key="'dir'+person.id">
+                                        <a v-if="person.profile_path" 
+                                        :href="'https://www.themoviedb.org/person/' + person.id" 
+                                        target="_blank"
+                                        class="flex-shrink-0 w-14 md:w-16 text-center group cursor-pointer block"
+                                        title="点击查看导演详情">
+                                            
+                                            <div class="w-12 h-12 md:w-14 md:h-14 mx-auto rounded-full overflow-hidden shadow-sm mb-1 border border-transparent group-hover:border-emby-accent transition-colors bg-gray-200 dark:bg-gray-700 relative z-0">
+                                                <img :src="person.profile_path" 
+                                                    class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-125" 
+                                                    loading="lazy">
+                                            </div>
+                                            <p class="text-[10px] md:text-s truncate text-gray-900 dark:text-gray-200 leading-tight group-hover:text-emby-accent transition-colors" :title="person.name">{{ person.name }}</p>
+                                            <p class="text-[9px] md:text-[10px] text-emby-accent/80 truncate scale-90 origin-top">导演</p>
+                                        </a>
+                                    </template>
+
+                                    <template v-for="person in detailData.cast" :key="'act'+person.id">
+                                        <a v-if="person.profile_path" 
+                                        :href="'https://www.themoviedb.org/person/' + person.id" 
+                                        target="_blank"
+                                        class="flex-shrink-0 w-14 md:w-16 text-center group cursor-pointer block"
+                                        title="点击查看演员详情">
+                                            
+                                            <div class="w-12 h-12 md:w-14 md:h-14 mx-auto rounded-full overflow-hidden shadow-sm mb-1 border border-transparent group-hover:border-emby-accent transition-colors bg-gray-200 dark:bg-gray-700 relative z-0">
+                                                <img :src="person.profile_path" 
+                                                    class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-125" 
+                                                    loading="lazy">
+                                            </div>
+                                            <p class="text-[10px] md:text-s truncate text-gray-900 dark:text-gray-200 leading-tight group-hover:text-emby-accent transition-colors" :title="person.name">{{ person.name }}</p>
+                                            <p class="text-[9px] md:text-[10px] text-gray-500 truncate scale-90 origin-top" :title="person.character">{{ person.character }}</p>
+                                        </a>
+                                    </template>
+                                </div>
+                            </div>
+
                         </div>
                     </div>
 
