@@ -352,8 +352,21 @@ createApp({
         const toasts = ref([]);
         let toastIdCounter = 0;
 
+        const savedScrollPosition = ref(0);
+        const showBackToTop = ref(false);
+
         let autoPlayInterval = null;
 
+        // 滚动监听
+        const handleScroll = () => {
+            // 超过 300px 显示回到顶部按钮
+            showBackToTop.value = window.scrollY > 300;
+        };
+
+        // 回到顶部功能
+        const scrollToTop = () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
         const dateRanges = computed(() => {
             const ranges = [];
             ranges.push({ label: '1950前', start: '1900-01-01', end: '1949-12-31' });
@@ -760,10 +773,19 @@ createApp({
         const toggleDateRange = (range) => { if (filters.value.dateRange?.label === range.label) filters.value.dateRange = null; else filters.value.dateRange = range; currentPage.value = 1; refreshData(); };
         const performSearch = () => { if(!searchQuery.value) return; currentView.value = 'search'; currentPage.value = 1; showMobileSearch.value = false; refreshData(); };
         const goHome = () => { currentView.value = 'home'; searchQuery.value = ''; currentPage.value = 1; refreshData(); };
-        const goBack = () => { currentView.value = searchQuery.value ? 'search' : 'home'; };
+        const goBack = () => { 
+            currentView.value = searchQuery.value ? 'search' : 'home'; 
+            // 视图切换完成后恢复滚动位置
+            nextTick(() => {
+                if (savedScrollPosition.value > 0) {
+                    window.scrollTo({ top: savedScrollPosition.value, behavior: 'auto' });
+                }
+            });
+        };
 
         // [Updated] goToDetail with Navigation State and Error Handling
         const goToDetail = async (id, type) => {
+            savedScrollPosition.value = window.scrollY;
             isNavigating.value = true; // Enable full-screen blur
             
             // Reset Detail States
@@ -882,10 +904,12 @@ createApp({
             });
 
             if (loadTrigger.value) observer.observe(loadTrigger.value);
+            window.addEventListener('scroll', handleScroll);
         });
 
         onUnmounted(() => {
             stopAutoPlay();
+            window.removeEventListener('scroll', handleScroll);
         });
 
         watch(loadTrigger, (el) => {
@@ -893,7 +917,7 @@ createApp({
         });
 
         return {
-            currentView, isDark, toggleTheme, mediaType, switchMediaType, mediaList, loading, isNavigating,
+            currentView, isDark, toggleTheme, mediaType, switchMediaType, mediaList, loading, isNavigating, showBackToTop, scrollToTop,
             searchQuery, performSearch, goHome, goBack, currentPage, showSearchTrending, handleSearchBlur,
             filters, genres, dateRanges, sortOptions, hasMore, loadTrigger, refreshData, showAdvancedFilters, toggleGenre, toggleDateRange, languageOptions, toggleLanguage,
             goToDetail, detailData, trendingList, trendingLoading, switchTrendingWindow, trendingTimeWindow, trendingContainer, isDragging, startDrag, onDrag, stopDrag, handleTrendClick, getRatingColor,
