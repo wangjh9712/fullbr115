@@ -355,6 +355,12 @@ createApp({
         const savedScrollPosition = ref(0);
         const showBackToTop = ref(false);
 
+        const isPosterFlipped = ref(false);
+        const togglePosterFlip = () => {
+            if (window.matchMedia('(hover: hover)').matches) return;
+            isPosterFlipped.value = !isPosterFlipped.value;
+        };
+
         let autoPlayInterval = null;
 
         // 滚动监听
@@ -787,7 +793,7 @@ createApp({
         const goToDetail = async (id, type) => {
             savedScrollPosition.value = window.scrollY;
             isNavigating.value = true; // Enable full-screen blur
-            
+            isPosterFlipped.value = false;
             // Reset Detail States
             detailData.value = null;
             currentSeasonData.value = null;
@@ -918,7 +924,7 @@ createApp({
 
         return {
             currentView, isDark, toggleTheme, mediaType, switchMediaType, mediaList, loading, isNavigating, showBackToTop, scrollToTop,
-            searchQuery, performSearch, goHome, goBack, currentPage, showSearchTrending, handleSearchBlur,
+            searchQuery, performSearch, goHome, goBack, currentPage, showSearchTrending, handleSearchBlur, isPosterFlipped, togglePosterFlip,
             filters, genres, dateRanges, sortOptions, hasMore, loadTrigger, refreshData, showAdvancedFilters, toggleGenre, toggleDateRange, languageOptions, toggleLanguage,
             goToDetail, detailData, trendingList, trendingLoading, switchTrendingWindow, trendingTimeWindow, trendingContainer, isDragging, startDrag, onDrag, stopDrag, handleTrendClick, getRatingColor,
             selectedSeasonNumber, currentSeasonData, selectSeason,
