@@ -700,7 +700,7 @@
                                     :tmdb-id="detailData.tmdb_id" 
                                     :season-number="currentSeasonData.season_number"
                                     media-type="tv_season"
-                                    :availability="detailData.availability"
+                                    :availability="currentSeasonData.availability"
                                     :injected-115="getCurrentSeason115(currentSeasonData.season_number)"
                                     context="season"
                                     @notify="showToast"
@@ -788,7 +788,7 @@
                                 :season-number="currentEpisode.season_number"
                                 :episode-number="currentEpisode.episode_number"
                                 media-type="tv_episode"
-                                :availability="detailData.availability"
+                                :availability="currentEpisode.availability"
                                 context="episode"
                                 @notify="showToast"
                             ></resource-panel>

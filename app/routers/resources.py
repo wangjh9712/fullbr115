@@ -53,7 +53,7 @@ def get_movie_resources(
 ):
     """获取电影资源：整合 115分享 + 磁力 + Ed2k"""
     try:
-        results = nullbr_service.fetch_movie(tmdb_id)
+        results = nullbr_service.fetch_movie(tmdb_id, source_type)
         return _filter_results(results, min_resolution, require_zh, source_type)
     except Exception as e:
         if "429" in str(e):

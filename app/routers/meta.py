@@ -88,6 +88,10 @@ async def get_media_details(
 @router.get("/details/tv/{tmdb_id}/season/{season_number}", response_model=Season)
 async def get_season_details(tmdb_id: int, season_number: int):
     try:
-        return tmdb_service.get_season_details(tmdb_id, season_number)
+        season_data = tmdb_service.get_season_details(tmdb_id, season_number)
+        
+        avail = nullbr_service.get_season_availability(tmdb_id, season_number)
+        season_data.availability = avail
+        return season_data
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))

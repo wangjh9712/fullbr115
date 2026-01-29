@@ -189,50 +189,154 @@ const ResourcePanel = {
         const localResources = ref([]);
         const loading = ref(false);
 
+        // --- 1. 计算 Tabs ---
+        const tabs = computed(() => {
+            const t = [];
+            
+            // A. 115分享
+            const has115 = (props.mediaType === 'movie' && props.availability?.has_115) || 
+                           (['tv', 'tv_season'].includes(props.mediaType) && props.injected115 && props.injected115.length > 0);
+            
+            if (has115) {
+                t.push({ id: '115_share', label: '115分享', icon: 'fa-solid fa-cloud' });
+            }
+
+            // B. 磁力链
+            if (['movie', 'tv_season', 'tv_episode'].includes(props.mediaType) && props.availability?.has_magnet) {
+                t.push({ id: 'magnet', label: '磁力链', icon: 'fa-solid fa-magnet' });
+            }
+
+            // C. Ed2k
+            if (['movie', 'tv_episode'].includes(props.mediaType) && props.availability?.has_ed2k) {
+                t.push({ id: 'ed2k', label: '电驴/Ed2k', icon: 'fa-solid fa-network-wired' });
+            }
+            
+            return t;
+        });
+
+        // --- 2. 获取数据 ---
+        const fetchLocalData = async () => {
+            if (!activeTab.value) return;
+            
+            // 特殊情况：TV/Season 的 115 数据是注入的，无需请求
+            if (['tv', 'tv_season'].includes(props.mediaType) && activeTab.value === '115_share') {
+                return;
+            }
+
+            loading.value = true;
+            localResources.value = []; // 先清空
+            
+            try {
+                const params = new URLSearchParams();
+                params.append('source_type', activeTab.value);
+
+                let url = '';
+                if (props.mediaType === 'movie') {
+                    url = `/resources/movie/${props.tmdbId}?${params.toString()}`;
+                } else if (props.mediaType === 'tv_season') {
+                    url = `/resources/tv/${props.tmdbId}/season/${props.seasonNumber}?${params.toString()}`;
+                } else if (props.mediaType === 'tv_episode') {
+                    url = `/resources/tv/${props.tmdbId}/season/${props.seasonNumber}/episode/${props.episodeNumber}?${params.toString()}`;
+                }
+
+                if (url) {
+                    const data = await fetchWithCache(url);
+                    localResources.value = data || [];
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                loading.value = false;
+            }
+        };
+
+        // --- 3. 初始化/重置 Tabs (修复优先级和重复请求) ---
+        const initTabs = () => {
+            if (tabs.value.length === 0) {
+                activeTab.value = '';
+                return;
+            }
+
+            // 优先级定义：115 > Magnet > Ed2k
+            const priorities = ['115_share', 'magnet', 'ed2k'];
+            
+            // 找到当前可用的最高优先级 Tab
+            let bestTab = '';
+            for (const type of priorities) {
+                if (tabs.value.find(t => t.id === type)) {
+                    bestTab = type;
+                    break; 
+                }
+            }
+
+            // 决策逻辑：
+            // 1. 如果当前没选中，选中最好的。
+            // 2. 如果当前选中的已经无效了，选中最好的。
+            // 3. [修复问题二] 如果最好的 Tab 是 115，但当前选的是 Magnet（说明之前 115 还没加载出来），强制切回 115。
+            const currentIsValid = tabs.value.some(t => t.id === activeTab.value);
+            const shouldSwitchTo115 = bestTab === '115_share' && activeTab.value !== '115_share';
+
+            if (!activeTab.value || !currentIsValid || shouldSwitchTo115) {
+                if (bestTab) {
+                    activeTab.value = bestTab;
+                    // 注意：这里赋值会触发 watch(activeTab)，从而自动调用 fetchLocalData
+                    // 所以这里千万不要手动调用 fetchLocalData，否则就是双重请求 [修复问题一]
+                }
+            } else {
+                // Tab 没变，但可能需要刷新数据 (例如从空数据变成有数据，或者组件刚挂载且值未变)
+                // 只有当本地数据为空 且 不是 115注入类型时，才手动拉取
+                const isInjected = ['tv', 'tv_season'].includes(props.mediaType) && activeTab.value === '115_share';
+                if (!isInjected && localResources.value.length === 0 && !loading.value) {
+                    fetchLocalData();
+                }
+            }
+        };
+
+        // --- 监听 ---
+
+        // 监听 Props 变化 (切换集数、Availability更新、115注入数据到达)
+        watch(() => [props.seasonNumber, props.episodeNumber, props.availability, props.injected115], () => {
+             // 这里不清空 localResources，交给 initTabs -> fetchLocalData 去处理
+             // 否则会导致闪烁
+             initTabs();
+        }, { deep: true });
+
+        // 监听 Tab 切换
+        watch(activeTab, (val, oldVal) => {
+            if (val && val !== oldVal) {
+                fetchLocalData();
+            }
+        });
+
+        onMounted(() => {
+            initTabs();
+        });
+
+        // --- 辅助函数 ---
         const isoFolderName = computed(() => {
             if (!props.mediaInfo || !props.mediaInfo.title) return '';
             const { title, date, tmdb_id } = props.mediaInfo;
             const year = date ? date.split('-')[0] : '';
-            
-            if (year) {
-                return `${title} (${year}) {tmdbid-${tmdb_id}}`;
-            }
-            return `${title} {tmdbid-${tmdb_id}}`;
+            return year ? `${title} (${year}) {tmdbid-${tmdb_id}}` : `${title} {tmdbid-${tmdb_id}}`;
         });
 
-        const tabs = computed(() => {
-            const t = [];
-            if ((props.injected115 && props.injected115.length > 0) || 
-                (props.mediaType === 'movie' && props.availability?.has_115)) {
-                t.push({ id: '115_share', label: '115分享', icon: 'fa-solid fa-cloud' });
-            }
-            const hasLocalMagnet = localResources.value.some(r => r.link_type === 'magnet');
-            if (hasLocalMagnet || (props.mediaType === 'movie' && props.availability?.has_magnet)) {
-                t.push({ id: 'magnet', label: '磁力链', icon: 'fa-solid fa-magnet' });
-            }
-            const hasLocalEd2k = localResources.value.some(r => r.link_type === 'ed2k');
-            if (hasLocalEd2k || (props.mediaType === 'movie' && props.availability?.has_ed2k)) {
-                t.push({ id: 'ed2k', label: '电驴/Ed2k', icon: 'fa-solid fa-network-wired' });
-            }
-            return t;
-        });
-
-        // Sorted Display Resources
         const displayResources = computed(() => {
             let list = [];
-            if (props.mediaType === 'tv_episode') {
-                list = [...localResources.value];
-            } else if (activeTab.value === '115_share' && props.mediaType !== 'movie') {
+            if (['tv', 'tv_season'].includes(props.mediaType) && activeTab.value === '115_share') {
                 list = [...(props.injected115 || [])];
             } else {
-                list = localResources.value.filter(r => r.link_type === activeTab.value);
+                list = localResources.value;
             }
-            // Sort by Size Descending
             return list.sort((a, b) => parseSize(b.size) - parseSize(a.size));
         });
 
         const isIso = (res) => (res.title || res.name || '').toLowerCase().endsWith('.iso');
-        const copyLink = (link) => navigator.clipboard.writeText(link).then(() => emit('notify', {message: '链接已复制', type:'success'})).catch(() => emit('notify', {message: '复制失败', type:'error'}));
+        
+        const copyLink = (link) => {
+            navigator.clipboard.writeText(link)
+                .then(() => emit('notify', {message: '链接已复制', type:'success'}))
+                .catch(() => emit('notify', {message: '复制失败', type:'error'}));
+        };
 
         const addOfflineTask = async (url) => {
             if (!url) return;
@@ -253,53 +357,6 @@ const ResourcePanel = {
                 emit('notify', { message: '请求失败: ' + e.message, type: 'error' });
             }
         };
-
-        const fetchLocalData = async () => {
-            loading.value = true;
-            localResources.value = [];
-            try {
-                let url = '';
-                if (props.mediaType === 'movie') {
-                    const params = new URLSearchParams();
-                    if(activeTab.value) params.append('source_type', activeTab.value);
-                    url = `/resources/movie/${props.tmdbId}?${params.toString()}`;
-                    const data = await fetchWithCache(url);
-                    localResources.value = data; 
-                } else if (props.mediaType === 'tv_season') {
-                    url = `/resources/tv/${props.tmdbId}/season/${props.seasonNumber}`;
-                    const data = await fetchWithCache(url);
-                    localResources.value = data;
-                } else if (props.mediaType === 'tv_episode') {
-                    url = `/resources/tv/${props.tmdbId}/season/${props.seasonNumber}/episode/${props.episodeNumber}`;
-                    const data = await fetchWithCache(url);
-                    localResources.value = data;
-                }
-            } catch (e) { console.error(e); } 
-            finally { loading.value = false; }
-        };
-
-        const updateActiveTab = () => {
-            if (props.mediaType === 'tv_episode') return;
-            const currentExists = tabs.value.find(t => t.id === activeTab.value);
-            if (currentExists) return;
-            if (tabs.value.length > 0) activeTab.value = tabs.value[0].id;
-            else activeTab.value = '';
-        };
-
-        watch([() => props.injected115, localResources], () => updateActiveTab());
-        watch(activeTab, () => { if (props.mediaType === 'movie') fetchLocalData(); });
-        watch(() => [props.seasonNumber, props.episodeNumber], () => { localResources.value = []; fetchLocalData(); });
-
-        onMounted(() => {
-            if (props.mediaType === 'movie' && props.availability) {
-                if (props.availability.has_115) activeTab.value = '115_share';
-                else if (props.availability.has_magnet) activeTab.value = 'magnet';
-                else activeTab.value = 'ed2k';
-                fetchLocalData();
-            } else {
-                fetchLocalData().then(() => updateActiveTab());
-            }
-        });
 
         return { activeTab, displayResources, tabs, loading, copyLink, isIso, addOfflineTask, isoFolderName };
     }
@@ -814,7 +871,9 @@ createApp({
                 window.scrollTo(0, 0);
 
                 if (targetType === 'tv') {
-                    fetchWithCache(`/resources/tv/${id}`).then(res => { raw115Resources.value = res || []; });
+                    if (data.availability && data.availability.has_115) {
+                        fetchWithCache(`/resources/tv/${id}`).then(res => { raw115Resources.value = res || []; });
+                    }
                     if (data.seasons?.length) {
                         const first = data.seasons.find(s => s.season_number === 1) || data.seasons[0];
                         selectSeason(first);
@@ -882,9 +941,32 @@ createApp({
             });
         };
 
-        const openEpisodeModal = (seasonNum, episode) => {
-            currentEpisode.value = { ...episode, season_number: seasonNum };
+        const openEpisodeModal = async (seasonNum, episode) => {
+            // 1. 初始化状态：先显示 Modal，但标记 loading，且 availability 为 null
+            currentEpisode.value = { 
+                ...episode, 
+                season_number: seasonNum, 
+                availability: null, 
+                loading: true 
+            };
             showEpisodeModal.value = true;
+
+            try {
+                // 2. 请求单集可用性接口
+                // 只有拿到这个 flag，ResourcePanel 才知道该显示 Magnet 还是 Ed2k，或者直接显示“无资源”
+                const availUrl = `/resources/availability/tv/${detailData.value.tmdb_id}/season/${seasonNum}/episode/${episode.episode_number}`;
+                const avail = await fetchWithCache(availUrl);
+                
+                // 3. 更新 currentEpisode
+                currentEpisode.value = {
+                    ...currentEpisode.value,
+                    availability: avail, // 注入真实的可用性数据
+                    loading: false
+                };
+            } catch (e) {
+                console.error("Failed to fetch episode availability", e);
+                currentEpisode.value = { ...currentEpisode.value, loading: false };
+            }
         };
         const closeEpisodeModal = () => showEpisodeModal.value = false;
 

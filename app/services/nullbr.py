@@ -48,19 +48,21 @@ class NullbrService:
 
     # --- Resource Fetching Methods ---
 
-    def fetch_movie(self, tmdb_id: int) -> List[MediaResource]:
-        """获取电影的所有资源 (115 + Magnet + Ed2k)"""
+    def fetch_movie(self, tmdb_id: int, source_type: Optional[str] = None) -> List[MediaResource]:
         if not self.client: return []
         resources = []
         try:
-            r1 = self.client.get_movie_115(tmdb_id)
-            if r1 and r1.items: resources.extend([self._parse_sdk_item(i, '115_share') for i in r1.items])
+            if not source_type or source_type == '115_share':
+                r1 = self.client.get_movie_115(tmdb_id)
+                if r1 and r1.items: resources.extend([self._parse_sdk_item(i, '115_share') for i in r1.items])
             
-            r2 = self.client.get_movie_magnet(tmdb_id)
-            if r2 and r2.magnet: resources.extend([self._parse_sdk_item(i, 'magnet') for i in r2.magnet])
-            
-            r3 = self.client.get_movie_ed2k(tmdb_id)
-            if r3 and r3.ed2k: resources.extend([self._parse_sdk_item(i, 'ed2k') for i in r3.ed2k])
+            if not source_type or source_type == 'magnet':
+                r2 = self.client.get_movie_magnet(tmdb_id)
+                if r2 and r2.magnet: resources.extend([self._parse_sdk_item(i, 'magnet') for i in r2.magnet])
+                
+            if not source_type or source_type == 'ed2k':
+                r3 = self.client.get_movie_ed2k(tmdb_id)
+                if r3 and r3.ed2k: resources.extend([self._parse_sdk_item(i, 'ed2k') for i in r3.ed2k])
         except Exception as e:
             print(f"Error fetching movie resources for {tmdb_id}: {e}")
             if "429" in str(e):

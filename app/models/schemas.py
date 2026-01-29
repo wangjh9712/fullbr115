@@ -43,6 +43,7 @@ class Episode(BaseModel):
     still_path: Optional[str] = None
     air_date: Optional[str] = None
     vote_average: float = 0.0
+    availability: Optional[ResourceAvailability] = None
 
 class Season(BaseModel):
     id: int
@@ -51,7 +52,8 @@ class Season(BaseModel):
     poster_path: Optional[str] = None
     episode_count: int
     air_date: Optional[str] = None
-    episodes: List[Episode] = [] # 获取特定季详情时填充
+    episodes: List[Episode] = []
+    availability: Optional[ResourceAvailability] = None
 
 # --- 详细信息 (详情页用) ---
 class MediaDetail(MediaMeta):
